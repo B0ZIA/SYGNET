@@ -7,15 +7,15 @@ using UnityEngine.UI;
 namespace Sygnet.App.UI
 {
     /// <summary>
-    /// Pełnoekranowy wynik weryfikacji w kolorze statusu (CLIENT_UNITY.md §5.3): status, typ z ikoną, dopisek,
+    /// Wynik weryfikacji (CLIENT_UNITY.md §5.3) na ciemnym tle jak cała aplikacja. Kolor statusu tylko w karcie
+    /// u góry (ramka z przyciemnionym tłem, ikona, ZWERYFIKOWANO / FAŁSZYWKA). Dalej typ z ikoną, dopisek,
     /// „Co robić”, nadawca z certyfikatu i odcisk, podpisujący, czasy. Dla FAŁSZYWKI powód po ludzku
     /// i BEZ treści atakującego.
     /// </summary>
     public class ResultScreen : AppScreen
     {
-        static readonly Color On = Color.white;
-        static readonly Color OnMuted = new Color(1, 1, 1, 0.72f);
-        static readonly Color Overlay = new Color(0, 0, 0, 0.22f);
+        static readonly Color On = Theme.Text;
+        static readonly Color OnMuted = Theme.Muted;
 
         readonly RectTransform body;
         readonly RectTransform content;
@@ -40,14 +40,14 @@ namespace Sygnet.App.UI
         public VerificationResult Current => current;
         public long ReceivedAt { get; private set; }
 
-        public ResultScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Result", Theme.Verified)
+        public ResultScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Result", Theme.Bg)
         {
             body = Ui.Rect(Safe, "Body");
             content = Ui.Scroll(body, "Scroll", 28, new RectOffset(56, 56, 40, 48));
 
             ok = Ui.Button(Safe, "OK", ButtonKind.Primary, () => App.CloseResult());
             Ui.Bottom((RectTransform)ok.transform, 40, Theme.ButtonHeight, Theme.Margin);
-            relayButton = Ui.Button(Safe, "Przekaż dalej", ButtonKind.OnColor, Relay, Icons.Speaker);
+            relayButton = Ui.Button(Safe, "Przekaż dalej", ButtonKind.Secondary, Relay, Icons.Speaker);
             Ui.Bottom((RectTransform)relayButton.transform, 40 + Theme.ButtonHeight + 24, Theme.ButtonHeight, Theme.Margin);
         }
 
@@ -56,7 +56,6 @@ namespace Sygnet.App.UI
         {
             current = r;
             ReceivedAt = receivedAt;
-            Background.color = Theme.ForStatus(r.Status);
             for (int i = content.childCount - 1; i >= 0; i--) Object.Destroy(content.GetChild(i).gameObject);
             Build(r, receivedAt, notice);
             relayButton.gameObject.SetActive(r.IsAuthentic);                // przekazujemy tylko prawdziwe
@@ -105,38 +104,35 @@ namespace Sygnet.App.UI
             Ui.Layout(Ui.Rect(top, "Spacer"), -1, -1, -1, 1);
             Ui.Label(top, Ui.Clock(receivedAt) + (App.TestClock ? " test" : ""), TextStyle.Mono, OnMuted, TextAlignmentOptions.MidlineRight);
 
-            // status
-            var head = Ui.Rect(content, "Head");
-            Ui.VStack(head, 14, new RectOffset(0, 0, 24, 8), TextAnchor.UpperCenter).childForceExpandWidth = false;
-            var iconBg = Ui.Image(head, "Circle", new Color(1, 1, 1, 0.16f), Icons.Circle);
-            Ui.Layout(iconBg, 150, 150, 150);
-            var icon = Ui.Image(iconBg.transform, "Icon", On, StatusIcon(r.Status));
-            Ui.Center(icon.rectTransform, new Vector2(84, 84));
-            var title = Ui.Label(head, Messages.Title(r.Status), TextStyle.Display, On, TextAlignmentOptions.Center);
+            // status: jedyne miejsce z kolorem – ramka z lekko zabarwionym tłem, ikona, tytuł, jedno zdanie
+            // (przy fałszywce od razu powód po ludzku)
+            var accent = Theme.AccentFor(r.Status);
+            var reason = rejected ? Messages.Reason(r, App.Trust) : null;
+            var frame = Ui.Card(content, "Status", Color.Lerp(Theme.Bg, accent, 0.42f), 40);
+            Ui.VStack(frame.rectTransform, 0, new RectOffset(3, 3, 3, 3));
+            var head = Ui.Card(frame.transform, "Fill", Color.Lerp(Theme.Bg, accent, 0.09f), 37);
+            Ui.VStack(head.rectTransform, 12, new RectOffset(40, 40, 40, 40), TextAnchor.UpperCenter).childForceExpandWidth = false;
+            var iconBg = Ui.Image(head.transform, "Circle", accent, Icons.Circle);
+            Ui.Layout(iconBg, 112, 112, 112);
+            var icon = Ui.Image(iconBg.transform, "Icon", Theme.Bg, StatusIcon(r.Status));
+            Ui.Center(icon.rectTransform, new Vector2(60, 60));
+            var title = Ui.Label(head.transform, Messages.Title(r.Status), TextStyle.Display, accent, TextAlignmentOptions.Center);
             title.enableAutoSizing = true;
-            title.fontSizeMin = 60;
-            title.fontSizeMax = 96;
+            title.fontSizeMin = 52;
+            title.fontSizeMax = 84;
             title.textWrappingMode = TextWrappingModes.NoWrap;
-            Ui.Layout(title, 116, 116, 968);
-            var line = Ui.Label(head, StatusLine(r, p), TextStyle.Body, On, TextAlignmentOptions.Center);
-            Ui.Layout(line, -1, -1, 968);
+            Ui.Layout(title, 100, 100, 880);
+            var line = Ui.Label(head.transform, reason ?? StatusLine(r, p), TextStyle.Body, On, TextAlignmentOptions.Center);
+            Ui.Layout(line, -1, -1, 880);
 
             if (notice != null)
             {
-                var c = Card(new Color(1, 1, 1, 0.16f), 22);
+                var c = Card(Theme.Surface2, 22);
                 Ui.Label(c, notice, TextStyle.BodyStrong, On, TextAlignmentOptions.Center);
             }
 
-            // powód odrzucenia – najważniejsze przy fałszywce
-            var reason = Messages.Reason(r, App.Trust);
-            if (rejected && reason != null)
-            {
-                var c = Card(new Color(0, 0, 0, 0.3f));
-                Ui.Label(c, reason, TextStyle.Headline, On);
-            }
-
             // treść: typ + dopisek (dopisek tylko z poprawnym podpisem – nie powielamy treści atakującego)
-            var msg = Card(Overlay);
+            var msg = Card(Theme.Surface);
             Ui.Label(msg, rejected ? "Podaje się za" : type.Code == "KEY_REVOKE" ? "Komunikat systemowy" : "Komunikat",
                 TextStyle.Overline, OnMuted);
             var typeRow = Row(msg, 22);
@@ -147,14 +143,14 @@ namespace Sygnet.App.UI
             if (rejected) Detail(msg, "Nadawca", IssuerLabel(r));
 
             // co robić
-            var todo = Card(Color.white);
-            Ui.Label(todo, "Co robić", TextStyle.Overline, Theme.Dim);
-            Ui.Label(todo, Instruction(r, type), TextStyle.Headline, Theme.Bg);
+            var todo = Card(Theme.Surface);
+            Ui.Label(todo, "Co robić", TextStyle.Overline, accent);
+            Ui.Label(todo, Instruction(r, type), TextStyle.Headline, On);
 
             // szczegóły z certyfikatu
             if (!rejected)
             {
-                var d = Card(Overlay);
+                var d = Card(Theme.Surface);
                 Detail(d, "Nadawca", IssuerLabel(r));
                 var fp = App.Trust.FingerprintOf(p.IssuerId);
                 if (fp != null) Detail(d, "Klucz", fp, mono: true);

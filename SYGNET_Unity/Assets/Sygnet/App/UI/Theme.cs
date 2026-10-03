@@ -77,6 +77,20 @@ namespace Sygnet.App.UI
             }
         }
 
+        /// <summary>Jasna barwa statusu na ciemnym tle (tytuł, ikona, obwódka) – te same co w konsoli nadawczej.</summary>
+        public static Color AccentFor(VerifyStatus s)
+        {
+            switch (s)
+            {
+                case VerifyStatus.Verified: return Hex("#3FD068");
+                case VerifyStatus.VerifiedOtherArea: return Hex("#6EA8FF");
+                case VerifyStatus.Expired: return Hex("#F5B860");
+                case VerifyStatus.Incomplete:
+                case VerifyStatus.Forged: return Hex("#FF6B5E");
+                default: return Text;
+            }
+        }
+
         public static Color ForStatus(VerifyStatus s)
         {
             switch (s)

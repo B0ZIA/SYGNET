@@ -59,6 +59,11 @@ namespace Sygnet.Core
 
         // ── wskaźniki dla UI / panelu debug ──
         public float Rms { get; private set; }
+
+        /// <summary>Głośność krótkookresowa (RMS wygładzony ~80 ms) – stabilna niezależnie od wielkości porcji próbek.</summary>
+        public float Loudness => (float)Math.Sqrt(loudEnergy);
+        double loudEnergy;
+        readonly double loudAlpha;
         public double PreambleA { get; private set; }     // P(1000 Hz) ostatniego okna
         public double PreambleB { get; private set; }     // P(5200 Hz) ostatniego okna
         public readonly double[] Spectrum;                // znormalizowane moce pasm do animacji
@@ -83,10 +88,12 @@ namespace Sygnet.Core
             ra = new double[scanWindows * 4];
             rb = new double[scanWindows * 4];
 
+            // pasma logarytmicznie 150..5000 Hz: widać i mowę (animacja nasłuchu), i ton sygnału
             var freqs = new double[24];
-            for (int i = 0; i < freqs.Length; i++) freqs[i] = 800 + i * 200;   // 800..5400 Hz: preambuła i dane
+            for (int i = 0; i < freqs.Length; i++) freqs[i] = 150 * Math.Pow(5000.0 / 150, i / (double)(freqs.Length - 1));
             spectrumBank = new ToneBank(sampleRate, Math.Min(1024, sampleRate / 40), freqs);
             Spectrum = new double[freqs.Length];
+            loudAlpha = 1 - Math.Exp(-1.0 / (0.08 * sampleRate));
         }
 
         public void Push(float[] samples) => Push(samples, 0, samples.Length);
@@ -150,8 +157,14 @@ namespace Sygnet.Core
 
         void UpdateLevels(float[] s, int offset, int count)
         {
-            double e = 0;
-            for (int i = offset; i < offset + count; i++) e += s[i] * s[i];
+            double e = 0, le = loudEnergy;
+            for (int i = offset; i < offset + count; i++)
+            {
+                double p = s[i] * s[i];
+                e += p;
+                le += loudAlpha * (p - le);
+            }
+            loudEnergy = le;
             Rms = (float)Math.Sqrt(e / count);
             // widmo tylko do animacji – najwyżej co pół okna, a nie przy każdej (nawet 1-próbkowej) porcji
             int n = spectrumBank.WindowLength;
