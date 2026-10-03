@@ -31,6 +31,7 @@ window.sygnet = {
     icon, segments, SEGMENT_CLASS, clock, dateTime,
     dot: (status) => DOT[status] ?? '#E5484D',
     title: (status) => TITLE[status] ?? status,
+    validity: (m) => (m < 60 ? `${m} min` : m <= 1440 ? `${m / 60} h` : `${m / 1440} dni`),
 };
 
 // ───────────── nadajnik (wspólny dla wszystkich stron) ─────────────
@@ -255,6 +256,7 @@ Alpine.data('consoleApp', () => ({
         if (action === 'play') this.$store.tx.play(b);
         if (action === 'qr') this.$store.qr.show(b);
         if (action === 'wav') this.$store.tx.wav(b);
+        if (action === 'poster') window.open(`/poster/${b.id}`, '_blank');
     },
 
     pick(b) {

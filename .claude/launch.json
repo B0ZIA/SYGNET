@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sygnet-console",
+      "runtimeExecutable": "C:\\Users\\qbagl\\AppData\\Local\\Microsoft\\WinGet\\Packages\\PHP.PHP.8.4_Microsoft.Winget.Source_8wekyb3d8bbwe\\php.exe",
+      "runtimeArgs": ["backend/artisan", "serve", "--host=127.0.0.1", "--port=8000"],
+      "port": 8000
+    }
+  ]
+}

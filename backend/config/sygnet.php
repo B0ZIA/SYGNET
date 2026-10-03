@@ -55,7 +55,8 @@ return [
     // pierwszy numer sequence w nowej bazie (np. 1000 na serwerze, jeśli telefony widziały numery z laptopa)
     'sequence_start' => (int) env('SYGNET_SEQUENCE_START', 1),
 
-    'validity_options' => [30, 120, 1440],
+    // ważność w minutach; 10080 = 7 dni (plakat z QR), maks. u16 = 65535
+    'validity_options' => [30, 120, 1440, 10080],
 
     'repeat_default' => 2,
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Broadcast;
 use App\Sygnet\AlertTypes;
 use App\Sygnet\Areas;
 use App\Sygnet\AttackFactory;
@@ -65,6 +66,20 @@ class PageController extends Controller
                 'root_key' => is_file($exporter->path(TrustStoreExporter::ROOT_KEY_FILE)),
             ],
         ]]);
+    }
+
+    /** GET /poster/{broadcast} – plakat A4 z kodem QR komunikatu (druk albo PDF z przeglądarki). */
+    public function poster(Broadcast $broadcast): View
+    {
+        $b = $this->broadcaster->present($broadcast);
+        $cert = $this->broadcaster->trust()?->certificate($b['issuer_id']);
+
+        return view('poster', [
+            'b' => $b,
+            'issuerFingerprint' => $cert?->fingerprint(),
+            'rootFingerprint' => $this->keys->has(KeyStore::ROOT) ? $this->keys->fingerprint(KeyStore::ROOT) : null,
+            'signerNames' => array_map(fn ($id) => $this->issuers->exists($id) ? $this->issuers->name($id) : "ID {$id}", $b['signer_ids']),
+        ]);
     }
 
     /** GET /keys/export/{file} – pliki dla aplikacji Unity (tylko klucze publiczne). */

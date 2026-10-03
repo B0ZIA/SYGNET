@@ -35,6 +35,8 @@ Telefon obywatela ma wbudowany klucz publiczny i **sprawdza podpis offline**:
 
 **Przekaż dalej:** telefon odtwarza zweryfikowany komunikat dźwiękiem sąsiadowi. Informacja rozchodzi się od człowieka do człowieka bez sieci, a nadal nie da się jej podrobić.
 
+**Nasłuch w tle:** aplikacja słucha także wtedy, gdy telefon leży w kieszeni z wygaszonym ekranem. Gdy w telewizji albo radiu po komunikacie zabrzmi sygnał SYGNET, przychodzi powiadomienie: ✅ prawdziwy albo 🟥 fałszywka.
+
 ## 3. Bezpieczeństwo w skrócie
 
 | Zagrożenie | Ochrona |
@@ -71,7 +73,7 @@ Wspólny kontrakt: `docs/PROTOCOL.md` + `testvectors/`. Implementacja referencyj
 | Osoba | Zakres | Dokument |
 |---|---|---|
 | **Bozia (Unity)** | aplikacja Android: rdzeń protokołu w C#, dekoder audio, QR, UI, przekaż dalej | `docs/CLIENT_UNITY.md` |
-| **Osoba 2 (Laravel)** | konsola, podpisywanie, modem JS, laboratorium ataków, klucze; prezentacja PDF | `docs/CONSOLE_LARAVEL.md` |
+| **Robert (Laravel)** | konsola, podpisywanie, modem JS, laboratorium ataków, klucze; prezentacja PDF | `docs/CONSOLE_LARAVEL.md` |
 
 ## 6. Harmonogram 24h i punkty synchronizacji
 
@@ -87,19 +89,23 @@ Wspólny kontrakt: `docs/PROTOCOL.md` + `testvectors/`. Implementacja referencyj
 
 **Zasada:** po S1 nikt nie zmienia protokołu bez zgody drugiej osoby.
 
-## 7. Scenariusz demo (3 min)
+## 7. Scenariusz demo (3 min, Kraków)
+
+Telefony mają ustawiony obszar **Kraków**, konsola (`/console`) też pokazuje podgląd telefonu z Krakowa.
 
 1. **Problem (20 s):** „W maju 2024 Rosjanie wrzucili przez PAP fałszywkę o mobilizacji. Jak obywatel ma odróżnić prawdę, gdy nie ma internetu?”
 2. **Tryb samolotowy:** pokazujemy na telefonach, że nie ma sieci.
-3. **Prawdziwy komunikat:** konsola, Wojewoda Mazowiecki, Alarm lotniczy, Warszawa, ▶. Ćwierk, telefony pokazują **✅ ZWERYFIKOWANO** + instrukcję.
-4. **Atak:** laboratorium, A1 „Podszycie pod Dowództwo Operacyjne”, ▶. Telefony pokazują **🟥 FAŁSZYWKA: podpis nie pasuje**.
-5. **Powtórka:** A3, stare prawdziwe nagranie. Telefony pokazują **⚠️ NIEAKTUALNY**.
-6. **Ewakuacja:** z jednym podpisem **🟥 NIEPEŁNY PODPIS**, z dwoma **✅**.
-7. **Sąsiad ostrzega sąsiada:** telefon A, „Przekaż dalej”, telefon B pokazuje **✅**.
-8. **QR:** plakat z kodem, skan, **✅**.
-9. **Puenta:** „Wróg może wyłączyć internet i podrobić komunikat, ale nie podrobi pieczątki.”
+3. **Prawdziwy komunikat:** konsola, Wojewoda Małopolski, Alarm lotniczy, Kraków, dopisek „Schron: piwnice i przejścia podziemne”, ▶. Ćwierk, telefony pokazują **✅ ZWERYFIKOWANO** + instrukcję.
+4. **Atak:** laboratorium (`/attack`), A1 „Podszycie pod Dowództwo Operacyjne”, ▶. Telefony pokazują **🟥 FAŁSZYWKA: podpis nie pasuje**.
+5. **Powtórka:** A3, prawdziwy alarm dla Krakowa sprzed 3 dni. Telefony pokazują **⚠️ NIEAKTUALNY**.
+6. **Ewakuacja Krakowa:** A5 z jednym podpisem daje **🟥 NIEPEŁNY PODPIS**; z konsoli Wojewoda Małopolski + Prezydent Miasta Krakowa (drugi operator zatwierdza PIN-em) daje **✅** z dwoma podpisami.
+7. **Telefon w kieszeni:** aplikacja w tle, ekran zgaszony, nadajemy z konsoli – na ekranie blokady przychodzi powiadomienie **✅ ZWERYFIKOWANO**.
+8. **Sąsiad ostrzega sąsiada:** telefon A, „Przekaż dalej”, telefon B pokazuje **✅**.
+9. **QR:** plakat z kodem (ważny 7 dni, drukowany z konsoli), skan, **✅**.
+10. **Puenta:** „Wróg może wyłączyć internet i podrobić komunikat, ale nie podrobi pieczątki.”
 
-Plan B: jeśli dźwięk zawodzi w hałasie, pokazujemy QR i odtwarzamy WAV bezpośrednio przy mikrofonie telefonu.
+Przed demo: na telefonach 5× dotknij logo → „Wyczyść skrzynkę i pamięć odbioru” (inaczej powtórzone próby pokażą „już w skrzynce”).
+Plan B: jeśli dźwięk zawodzi w hałasie, pokazujemy QR i odtwarzamy WAV z konsoli bezpośrednio przy mikrofonie telefonu.
 
 ## 8. Prezentacja (maks. 10 slajdów)
 
@@ -127,7 +133,7 @@ Plan B: jeśli dźwięk zawodzi w hałasie, pokazujemy QR i odtwarzamy WAV bezpo
 
 W zgłoszeniu ujawniamy:
 
-- **AI:** koncepcja, specyfikacja protokołu, implementacja referencyjna (`tools/sygnet_ref.py`) i dokumentacja powstały z pomocą Claude (Anthropic). Kod aplikacji z pomocą Claude Code. Zespół rozumie i potrafi obronić każdy element.
-- **Biblioteki:** BouncyCastle (MIT), ZXing.Net (Apache 2.0), Laravel (MIT), ext-sodium/libsodium (ISC), qrcode (MIT), numpy, cryptography (Python).
+- **AI:** koncepcja, specyfikacja protokołu, implementacja referencyjna (`tools/sygnet_ref.py`) i dokumentacja powstały z pomocą Claude (Anthropic). Kod aplikacji i konsoli z pomocą Claude Code. Zespół rozumie i potrafi obronić każdy element.
+- **Biblioteki:** BouncyCastle (MIT), ZXing.Net (Apache 2.0), Laravel (MIT), ext-sodium/libsodium (ISC), Alpine.js (MIT), Tailwind CSS (MIT), Vite (MIT), qrcode (MIT), numpy, cryptography (Python). Fonty Inter i JetBrains Mono (SIL Open Font License 1.1).
 - **Inspiracja:** idea transmisji danych dźwiękiem (np. projekt ggwave). Modem SYGNET to własna, prostsza implementacja.
 - Wszystko powstało podczas HackYeah 2026.

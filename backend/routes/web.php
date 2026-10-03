@@ -18,6 +18,7 @@ Route::middleware(ConsolePassword::class)->group(function () {
     Route::get('/attack', [PageController::class, 'attack'])->name('attack');
     Route::get('/keys', [PageController::class, 'keys'])->name('keys');
     Route::get('/keys/export/{file}', [PageController::class, 'export'])->name('keys.export');
+    Route::get('/poster/{broadcast}', [PageController::class, 'poster'])->name('poster');
 
     // JSON w grupie „web”: sesja + CSRF (CONSOLE_LARAVEL.md §5.3) – konsola działa lokalnie albo za hasłem
     Route::prefix('api')->group(function () {

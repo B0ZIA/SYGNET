@@ -48,7 +48,7 @@
                     <div class="seg">
                         <template x-for="m in boot.validity" :key="m">
                             <button type="button" :aria-pressed="form.valid_minutes === m" @click="form.valid_minutes = m"
-                                    x-text="m < 60 ? m + ' min' : (m / 60) + ' h'"></button>
+                                    x-text="sygnet.validity(m)"></button>
                         </template>
                     </div>
                 </div>
@@ -98,9 +98,15 @@
                 <button type="button" class="btn btn-ghost !py-2" :disabled="!canSign || busy" @click="act('qr')">
                     <span x-html="sygnet.icon('qr', 'size-4')"></span> POKAŻ QR
                 </button>
-                <button type="button" class="btn btn-ghost !py-2" :disabled="!canSign || busy" @click="act('wav')">
-                    <span x-html="sygnet.icon('download', 'size-4')"></span> WAV
-                </button>
+                <div class="flex gap-2">
+                    <button type="button" class="btn btn-ghost flex-1 !px-3 !py-2" :disabled="!canSign || busy" @click="act('wav')">
+                        <span x-html="sygnet.icon('download', 'size-4')"></span> WAV
+                    </button>
+                    <button type="button" class="btn btn-ghost flex-1 !px-3 !py-2" :disabled="!canSign || busy" @click="act('poster')"
+                            title="Plakat A4 z kodem QR do druku">
+                        <span x-html="sygnet.icon('print', 'size-4')"></span> PLAKAT
+                    </button>
+                </div>
             </div>
         </x-transmit>
 
@@ -126,6 +132,7 @@
                                 <button type="button" class="rounded-lg p-1.5 hover:bg-line" title="Nadaj ponownie" @click.stop="replay(b)" x-html="sygnet.icon('play', 'size-3.5')"></button>
                                 <button type="button" class="rounded-lg p-1.5 hover:bg-line" title="QR" @click.stop="$store.qr.show(b)" x-html="sygnet.icon('qr', 'size-3.5')"></button>
                                 <button type="button" class="rounded-lg p-1.5 hover:bg-line" title="WAV" @click.stop="$store.tx.wav(b)" x-html="sygnet.icon('download', 'size-3.5')"></button>
+                                <a class="rounded-lg p-1.5 hover:bg-line" title="Plakat do druku" :href="`/poster/${b.id}`" target="_blank" @click.stop x-html="sygnet.icon('print', 'size-3.5')"></a>
                             </span>
                         </div>
                     </template>

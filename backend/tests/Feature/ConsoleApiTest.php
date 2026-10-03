@@ -94,6 +94,21 @@ class ConsoleApiTest extends TestCase
         $this->get('/console')->assertOk()->assertDontSee('Wyloguj');
     }
 
+    public function test_poster_with_seven_day_validity(): void
+    {
+        $b = $this->broadcast(['type' => 7, 'issuer_id' => 7, 'valid_minutes' => 10080, 'note' => 'Punkt informacyjny: Rynek Główny 1'])
+            ->assertCreated()->json();
+        $this->assertSame($b['timestamp'] + 7 * 86400, $b['valid_until']);
+
+        $this->get("/poster/{$b['id']}")->assertOk()
+            ->assertSee($b['qr_text'], false)
+            ->assertSee('Ostrzeżenie przed dezinformacją')
+            ->assertSee('Prezydent Miasta Krakowa')
+            ->assertSee('(7 dni)');
+        $this->get('/poster/999999')->assertNotFound();
+        $this->broadcast(['valid_minutes' => 99999])->assertStatus(422);
+    }
+
     public function test_sequence_starts_from_configured_number(): void
     {
         config(['sygnet.sequence_start' => 1000]);
