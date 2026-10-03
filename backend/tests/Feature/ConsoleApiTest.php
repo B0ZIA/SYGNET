@@ -75,6 +75,19 @@ class ConsoleApiTest extends TestCase
         $this->get('/console')->assertRedirect('/login');
     }
 
+    public function test_jury_info_shows_password_and_pin_only_when_enabled(): void
+    {
+        config(['sygnet.console_password' => 'haslo-dla-jury', 'sygnet.second_operator_pin' => '2468', 'sygnet.jury_info' => true]);
+        $this->get('/login')->assertOk()->assertSee('Dla oceniających')->assertSee('haslo-dla-jury')->assertSee('2468');
+        $this->post('/login', ['password' => 'haslo-dla-jury']);
+        $this->get('/console')->assertOk()->assertSee('Dla oceniających')->assertSee('2468');
+
+        config(['sygnet.jury_info' => false]);
+        $this->get('/console')->assertOk()->assertDontSee('Dla oceniających')->assertDontSee('2468');
+        $this->post('/logout');
+        $this->get('/login')->assertOk()->assertDontSee('haslo-dla-jury');
+    }
+
     public function test_login_page_without_password_goes_to_console(): void
     {
         $this->get('/login')->assertRedirect('/console');

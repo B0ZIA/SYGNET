@@ -96,7 +96,12 @@ SYGNET_CONSOLE_PASSWORD=TU_DLUGIE_HASLO   # hasło do konsoli – OBOWIĄZKOWO
 SYGNET_SECOND_PIN=1234                    # PIN drugiego operatora przy ewakuacji – można zmienić tutaj
 SYGNET_SEQUENCE_START=1000                # numery komunikatów od 1000 – patrz punkt 0.3
 SYGNET_USER_AREA=1261                     # obszar telefonu w podglądzie (1261 = Kraków)
+SYGNET_JURY_INFO=true                     # ramka „Dla oceniających” z hasłem i PIN-em – po ocenie: false
 ```
+
+`SYGNET_JURY_INFO=true` pokazuje na stronie logowania i w oknie PIN-u ramkę „Dla oceniających” z hasłem i PIN-em
+(żeby oceniający mógł wejść i zatwierdzić ewakuację). Uwaga: wtedy hasło zna każdy, kto otworzy adres –
+po zakończeniu oceny ustaw `false` albo zmień hasło i uruchom `php artisan optimize`.
 
 Jeśli strona działa po **HTTPS**, dopisz też `SESSION_SECURE_COOKIE=true`. Po samym HTTP **nie** dopisuj –
 logowanie by nie działało.

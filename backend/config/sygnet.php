@@ -62,6 +62,9 @@ return [
     // hasło do całej konsoli (serwer publiczny bez dostępu do nginx); puste = bez logowania (lokalnie, offline)
     'console_password' => (string) env('SYGNET_CONSOLE_PASSWORD', ''),
 
+    // ramka „Dla oceniających” z hasłem i PIN-em (na czas oceny HackYeah); false = wersja docelowa, bez podpowiedzi
+    'jury_info' => (bool) env('SYGNET_JURY_INFO', true),
+
     // PIN „drugiego operatora” przy komunikacie krytycznym – tylko na demo, podpis i tak jest podwójny
     'second_operator_pin' => env('SYGNET_SECOND_PIN', '1234'),
 

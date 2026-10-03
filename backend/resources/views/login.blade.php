@@ -26,6 +26,13 @@
         @enderror
 
         <button type="submit" class="btn btn-go mt-6 w-full">Zaloguj</button>
+
+        <div class="mt-6">
+            @include('partials.jury-info', ['items' => [
+                'Hasło do konsoli' => config('sygnet.console_password'),
+                'PIN drugiego operatora (ewakuacja)' => config('sygnet.second_operator_pin'),
+            ]])
+        </div>
     </form>
 </body>
 </html>
