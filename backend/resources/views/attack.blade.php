@@ -12,14 +12,14 @@
         </div>
 
         {{-- karty ataków --}}
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3 tall:min-h-0 tall:flex-1">
+        <div class="scroll-thin grid grid-cols-1 content-start gap-4 md:grid-cols-2 2xl:grid-cols-3 3xl:grid-cols-4 tall:min-h-0 tall:flex-1 tall:overflow-y-auto tall:pr-1">
             <template x-for="(a, code) in attacks" :key="code">
-                <section class="panel flex min-h-0 flex-col gap-3 p-4" :class="selected?.attack_type === code && '!border-alarm/60 ring-1 ring-alarm/30'">
+                <section class="panel flex flex-col gap-3 p-4" :class="selected?.attack_type === code && '!border-alarm/60 ring-1 ring-alarm/30'">
                     <div class="flex items-start gap-3">
-                        <span class="mono rounded-md bg-danger/20 px-2 py-0.5 text-sm font-bold text-alarm" x-text="code"></span>
+                        <span class="mono shrink-0 rounded-md bg-danger/20 px-2 py-0.5 text-sm font-bold text-alarm" x-text="code"></span>
                         <div class="text-[15px] leading-snug font-bold" x-text="a.title"></div>
                     </div>
-                    <p class="text-[13px] leading-snug text-muted" x-text="a.what"></p>
+                    <p class="text-[12.5px] leading-snug text-muted" x-text="a.what"></p>
 
                     {{-- parametry --}}
                     <template x-if="code === 'A1'">
@@ -66,10 +66,11 @@
                     </template>
 
                     <div class="mt-auto space-y-2.5">
-                        <div class="flex items-center gap-2 text-xs">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
                             <span class="text-muted">Telefon:</span>
-                            <span class="mono rounded-md px-1.5 py-0.5 font-bold" :style="`background:${sygnet.dot(a.expect)}26;color:${sygnet.dot(a.expect)}`"
-                                  x-text="`${a.expect} ${a.reason}`"></span>
+                            <span class="rounded-md px-1.5 py-0.5 font-bold" :style="`background:${sygnet.dot(a.expect)}26;color:${sygnet.dot(a.expect)}`"
+                                  :title="`${a.expect} ${a.reason}`" x-text="sygnet.title(a.expect)"></span>
+                            <span class="mono min-w-0 truncate text-[10px] text-dim" x-text="a.reason"></span>
                             <template x-if="results[code]?.check">
                                 <span class="mono ml-auto font-bold" :class="results[code].as_expected ? 'text-go' : 'text-expired'"
                                       x-text="results[code].as_expected ? '✓ zgodnie' : results[code].check.status"></span>
@@ -97,21 +98,21 @@
         <x-transmit>
             <div class="flex flex-col gap-1 pr-2">
                 <span class="panel-title">Nadawanie</span>
-                <span class="max-w-40 text-sm font-semibold" x-text="selected ? `${selected.attack_type}: ${attacks[selected.attack_type]?.title}` : 'wybierz atak'"></span>
+                <span class="max-w-44 text-sm font-semibold" x-text="selected ? `${selected.attack_type}: ${attacks[selected.attack_type]?.title}` : 'wybierz atak'"></span>
             </div>
         </x-transmit>
     </div>
 
-    <div class="col-span-12 flex min-h-0 flex-col gap-4 xl:col-span-4">
-        <section class="panel flex flex-col items-center gap-3 p-5">
-            <div class="flex w-full items-center justify-between">
+    <div class="scroll-thin col-span-12 flex min-h-0 flex-col gap-4 xl:col-span-4 tall:overflow-y-auto">
+        <section class="panel flex shrink-0 flex-col items-center gap-3 p-5">
+            <div class="flex w-full flex-wrap items-center justify-between gap-2">
                 <h2 class="panel-title">Telefon obywatela</h2>
                 <span class="chip"><span x-html="sygnet.icon('pin', 'size-3.5')"></span><span x-text="boot.areas.find(a => a.code === boot.userArea)?.name"></span></span>
             </div>
             @include('partials.phone', ['idle' => 'Wybierz atak i nadaj go – zobaczysz, co pokaże telefon.'])
-            <div class="w-full rounded-xl bg-bg px-4 py-2.5 text-xs" x-show="selected?.check">
+            <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-bg px-4 py-2.5 text-xs" x-show="selected?.check">
                 <span class="text-muted">Kontrolna weryfikacja:</span>
-                <span class="mono font-bold" x-text="selected?.check ? `${selected.check.status} ${selected.check.reason}` : ''"></span>
+                <span class="mono font-bold break-all" x-text="selected?.check ? `${selected.check.status} ${selected.check.reason}` : ''"></span>
             </div>
         </section>
         @include('partials.hex', ['frame' => 'selected', 'empty' => 'Bajty ataku pojawią się tutaj. W A2 na czerwono bajty zmienione względem oryginału.'])

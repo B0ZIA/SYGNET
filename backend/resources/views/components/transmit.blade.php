@@ -1,14 +1,14 @@
 {{-- Pasek nadawania: zapis tonów ramki, kursor, widmo na żywo, postęp. Przyciski akcji podaje strona. --}}
-<div class="panel flex flex-wrap items-stretch gap-5 p-4 lg:flex-nowrap">
+<div class="panel flex flex-wrap items-stretch gap-4 p-4">
     <div class="flex shrink-0 items-center gap-3">
         {{ $slot }}
     </div>
 
-    <div class="relative min-w-[280px] flex-1">
+    <div class="relative min-w-[260px] flex-1">
         <canvas x-data x-init="$store.tx.attach($el)" class="block h-[104px] w-full rounded-xl bg-bg"></canvas>
     </div>
 
-    <div class="flex w-44 shrink-0 flex-col justify-center gap-2">
+    <div class="flex w-40 shrink-0 flex-col justify-center gap-2">
         <div class="flex items-baseline justify-between">
             <span class="mono text-3xl font-bold" x-text="Math.round($store.tx.progress * 100) + '%'"></span>
             <button type="button" class="text-xs font-semibold text-muted hover:text-ink" x-show="$store.tx.playing" @click="$store.tx.stop()">STOP</button>

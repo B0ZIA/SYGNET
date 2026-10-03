@@ -57,12 +57,12 @@ export function draw(canvas, st) {
     g.fillStyle = '#ffffff06';
     g.fillRect(0, y(3000 + 50), plotW, y(1500 - 50) - y(3000 + 50));
     g.fillRect(0, y(4700 + 50), plotW, y(3200 - 50) - y(4700 + 50));
-    g.font = '600 10px "JetBrains Mono", monospace';
-    g.fillStyle = '#5B6570';
-    g.fillText('A 1500–3000 Hz', 6, y(3000) - 4);
-    g.fillText('B 3200–4700 Hz', 6, y(4700) - 4);
-
     if (st.frame?.length) {
+        g.font = '600 10px "JetBrains Mono", monospace';
+        g.fillStyle = '#5B6570';
+        g.fillText('B 3200–4700 Hz', 6, y(4700) - 4);
+        g.fillText('A 1500–3000 Hz', 6, y(3000) - 4);
+
         const { tones, total } = plan(st.frame, st.repeat);
         const now = st.progress * total;
         const x = (t) => (t / total) * plotW;
@@ -85,7 +85,9 @@ export function draw(canvas, st) {
     } else {
         g.fillStyle = '#5B6570';
         g.font = '500 13px Inter, sans-serif';
-        g.fillText('Tu pojawi się zapis tonów ramki – 1 bajt = 2 tony przez 40 ms', 12, h / 2 + 4);
+        g.textAlign = 'center';
+        g.fillText(plotW > 420 ? 'Tu pojawi się zapis tonów ramki – 1 bajt = 2 tony przez 40 ms' : 'Zapis tonów ramki', plotW / 2, h / 2 + 4);
+        g.textAlign = 'left';
     }
 
     // widmo na żywo (prawa krawędź)

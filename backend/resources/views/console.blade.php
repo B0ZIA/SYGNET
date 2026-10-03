@@ -6,11 +6,11 @@
 
         {{-- formularz --}}
         <section class="panel p-6">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-wrap items-center justify-between gap-2">
                 <h2 class="panel-title">Nowy komunikat</h2>
-                <span class="chip mono" x-show="issuer?.fingerprint">
+                <span class="chip mono max-w-full overflow-hidden" x-show="issuer?.fingerprint">
                     <span x-html="sygnet.icon('lock', 'size-3.5')"></span>
-                    <span x-text="`podpisuje: ${issuer?.name} · ${issuer?.fingerprint}`"></span>
+                    <span class="truncate" x-text="`podpisuje: ${issuer?.name} · ${issuer?.fingerprint}`"></span>
                 </span>
             </div>
 
@@ -79,7 +79,7 @@
                 </template>
             </div>
 
-            <div class="mt-5 flex items-center gap-5 border-t border-line pt-4 text-sm text-muted">
+            <div class="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-4 text-sm text-muted">
                 <span class="mono" x-text="`📦 ${estimateBytes} B`"></span>
                 <span class="mono" x-text="`🔊 ~${estimateSeconds.replace('.', ',')} s (${$store.tx.repeat}×)`"></span>
                 <span x-show="signed" class="mono text-go" x-text="signed ? `podpisano · seq ${signed.sequence}` : ''"></span>
@@ -117,12 +117,12 @@
                             <span class="mono w-10 text-xs text-dim" x-text="'#' + b.sequence"></span>
                             <span class="mono text-xs text-muted" x-text="sygnet.clock(b.timestamp)"></span>
                             <span class="shrink-0" x-html="sygnet.icon(b.type_icon, 'size-4')"></span>
-                            <span class="min-w-0 flex-1 truncate text-sm">
-                                <span class="font-semibold" x-text="b.type_name"></span>
-                                <span class="text-muted" x-text="' · ' + b.area_name"></span>
+                            <span class="flex min-w-0 flex-1 flex-col text-sm leading-tight">
+                                <span class="truncate font-semibold" x-text="b.type_name"></span>
+                                <span class="truncate text-xs text-muted" x-text="b.area_name + (b.signer_ids.length > 1 ? ' · 2 podpisy' : '')"></span>
                             </span>
                             <span class="size-2 shrink-0 rounded-full" :style="`background:${sygnet.dot(b.check?.status)}`" :title="b.check?.status"></span>
-                            <span class="flex gap-1 opacity-60 group-hover:opacity-100">
+                            <span class="flex shrink-0 gap-1 opacity-60 group-hover:opacity-100">
                                 <button type="button" class="rounded-lg p-1.5 hover:bg-line" title="Nadaj ponownie" @click.stop="replay(b)" x-html="sygnet.icon('play', 'size-3.5')"></button>
                                 <button type="button" class="rounded-lg p-1.5 hover:bg-line" title="QR" @click.stop="$store.qr.show(b)" x-html="sygnet.icon('qr', 'size-3.5')"></button>
                                 <button type="button" class="rounded-lg p-1.5 hover:bg-line" title="WAV" @click.stop="$store.tx.wav(b)" x-html="sygnet.icon('download', 'size-3.5')"></button>
@@ -137,7 +137,7 @@
 
     {{-- ───────── podgląd na telefonie ───────── --}}
     <section class="panel col-span-12 flex min-h-0 flex-col items-center gap-4 p-5 xl:col-span-4">
-        <div class="flex w-full items-center justify-between">
+        <div class="flex w-full flex-wrap items-center justify-between gap-2">
             <h2 class="panel-title">Podgląd na telefonie</h2>
             <label class="flex items-center gap-2 text-xs text-muted">
                 <span x-html="sygnet.icon('pin', 'size-4')"></span>
@@ -153,10 +153,10 @@
 
         <div class="w-full rounded-xl bg-bg px-4 py-3 text-xs">
             <template x-if="signed?.check">
-                <div class="flex items-center gap-2">
-                    <span class="size-2 rounded-full" :style="`background:${phone?.color ?? '#5B6570'}`"></span>
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span class="size-2 shrink-0 rounded-full" :style="`background:${phone?.color ?? '#5B6570'}`"></span>
                     <span class="text-muted">Kontrolna weryfikacja (jak w aplikacji):</span>
-                    <span class="mono font-bold" x-text="`${phone?.status ?? signed.check.status} ${signed.check.reason}`"></span>
+                    <span class="mono font-bold break-all" x-text="`${phone?.status ?? signed.check.status} ${signed.check.reason}`"></span>
                 </div>
             </template>
             <template x-if="!signed">

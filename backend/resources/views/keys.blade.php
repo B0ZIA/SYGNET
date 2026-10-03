@@ -101,7 +101,7 @@
                 <h2 class="panel-title">Unieważnienie na telefonie</h2>
                 <span class="text-xs text-alarm" x-text="error"></span>
             </div>
-            <div class="origin-top scale-[0.82]">
+            <div class="[zoom:0.82]">
                 @include('partials.phone', ['idle' => 'KEY_REVOKE od ROOT: telefon zapisuje unieważnienie na stałe i odrzuca kolejne podpisy tym kluczem.'])
             </div>
         </section>

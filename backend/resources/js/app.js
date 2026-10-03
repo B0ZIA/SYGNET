@@ -23,7 +23,12 @@ async function api(method, url, body) {
 
 // helpery dostępne w szablonach
 const DOT = { VERIFIED: '#2EA043', VERIFIED_OTHER_AREA: '#3B82F6', EXPIRED: '#B7791F', DUPLICATE: '#5B6570' };
-window.sygnet = { icon, segments, SEGMENT_CLASS, clock, dateTime, dot: (status) => DOT[status] ?? '#E5484D' };
+const TITLE = { VERIFIED: 'ZWERYFIKOWANO', VERIFIED_OTHER_AREA: 'INNY OBSZAR', EXPIRED: 'NIEAKTUALNY', INCOMPLETE: 'NIEPEŁNY PODPIS', FORGED: 'FAŁSZYWKA' };
+window.sygnet = {
+    icon, segments, SEGMENT_CLASS, clock, dateTime,
+    dot: (status) => DOT[status] ?? '#E5484D',
+    title: (status) => TITLE[status] ?? status,
+};
 
 // ───────────── nadajnik (wspólny dla wszystkich stron) ─────────────
 Alpine.store('tx', {
