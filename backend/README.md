@@ -50,6 +50,8 @@ Po podmianie trzeba zbudować APK od nowa. Nowe klucze = telefony ze starym ROOT
 
 ## Uruchomienie
 
+Wdrożenie na serwer (VPS, nginx, HTTPS, hasło, przeniesienie kluczy): **[DEPLOY.md](DEPLOY.md)**.
+
 ```bash
 php artisan serve        # http://127.0.0.1:8000 → /console
 ```
