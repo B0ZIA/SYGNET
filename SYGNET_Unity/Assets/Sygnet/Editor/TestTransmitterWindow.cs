@@ -75,6 +75,8 @@ namespace Sygnet.Editor
             {
                 if (GUILayout.Button("Generuj", GUILayout.Height(32))) Generate();
                 GUI.enabled = frame != null;
+                if (GUILayout.Button("▶ Odtwórz", GUILayout.Height(32))) PlayFrame(frame);
+                if (GUILayout.Button("■ Stop", GUILayout.Height(32))) StopPlayback();
                 if (GUILayout.Button("Zapisz WAV", GUILayout.Height(32))) SaveWav();
                 if (GUILayout.Button("Kopiuj tekst QR", GUILayout.Height(32))) EditorGUIUtility.systemCopyBuffer = qrText;
                 GUI.enabled = true;
@@ -108,6 +110,40 @@ namespace Sygnet.Editor
             qr = RenderQr(qrText);
             Debug.Log("[SYGNET] Nadajnik: " + s.Label + "\n" + qrText + "\n" + Bytes.ToHex(frame));
             Repaint();
+        }
+
+        static readonly string PreviewPath = Path.Combine(Path.GetTempPath(), "sygnet_preview.wav");
+
+#if UNITY_EDITOR_WIN
+        [System.Runtime.InteropServices.DllImport("winmm.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        static extern bool PlaySound(string sound, IntPtr module, uint flags);
+        const uint SndAsync = 0x0001, SndNoDefault = 0x0002, SndFilename = 0x00020000;
+#endif
+
+        /// <summary>
+        /// Odtwarza ramkę z głośników komputera (2 powtórzenia, 48 kHz) poza trybem Play. Na Windows przez winmm
+        /// PlaySound (AudioUtil.PlayPreviewClip edytora nie gra klipów z AudioClip.Create), gdzie indziej –
+        /// domyślnym odtwarzaczem systemu.
+        /// </summary>
+        public static float PlayFrame(byte[] frame)
+        {
+            var x = ModemEncoder.Encode(frame, 48000);
+            StopPlayback();
+            File.WriteAllBytes(PreviewPath, Wav.Write16(x, 48000));
+#if UNITY_EDITOR_WIN
+            if (!PlaySound(PreviewPath, IntPtr.Zero, SndAsync | SndNoDefault | SndFilename))
+                Debug.LogError("[SYGNET] PlaySound nie odtworzył " + PreviewPath);
+#else
+            EditorUtility.OpenWithDefaultApp(PreviewPath);
+#endif
+            return x.Length / 48000f;
+        }
+
+        public static void StopPlayback()
+        {
+#if UNITY_EDITOR_WIN
+            PlaySound(null, IntPtr.Zero, 0);
+#endif
         }
 
         void SaveWav()

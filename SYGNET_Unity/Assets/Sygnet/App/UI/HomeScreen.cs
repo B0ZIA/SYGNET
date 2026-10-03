@@ -6,8 +6,8 @@ using UnityEngine.UI;
 namespace Sygnet.App.UI
 {
     /// <summary>
-    /// Ekran główny (CLIENT_UNITY.md §5.2). W U4: gotowość + skan QR. W U5 dochodzi nasłuch mikrofonu
-    /// (pulsujący okrąg, widmo, „Odbieram… 34%”).
+    /// Ekran główny (CLIENT_UNITY.md §5.2): nasłuch mikrofonu (pulsujący okrąg, widmo wokół niego,
+    /// „Odbieram… 34%” wg frame_len), skan QR i ostatni komunikat.
     /// </summary>
     public class HomeScreen : AppScreen
     {
@@ -18,6 +18,12 @@ namespace Sygnet.App.UI
         readonly Image coreIcon;
         readonly TextMeshProUGUI status, hint;
         readonly Button lastButton;
+        readonly RectTransform progressTrack, progressFill;
+
+        const int BarCount = 48;
+        readonly RectTransform[] bars;
+        readonly float[] barLevels = new float[BarCount];
+        float smoothLevel;
 
         int logoTaps;
         float lastLogoTap;
@@ -64,15 +70,40 @@ namespace Sygnet.App.UI
             ring1 = Ui.Image(center, "Ring1", Theme.Accent, Icons.Ring);
             ring2 = Ui.Image(center, "Ring2", Theme.Accent, Icons.Ring);
             foreach (var r in new[] { ring1, ring2 }) Ui.Center(r.rectTransform, new Vector2(460, 460));
+
+            // widmo: słupki promieniście wokół okręgu (pasma 800–5400 Hz z dekodera)
+            bars = new RectTransform[BarCount];
+            for (int i = 0; i < BarCount; i++)
+            {
+                var pivot = Ui.Rect(center, "BarPivot");
+                Ui.Center(pivot, Vector2.zero);
+                pivot.localEulerAngles = new Vector3(0, 0, -360f * i / BarCount);
+                var bar = Ui.Card(pivot, "Bar", Theme.WithAlpha(Theme.Accent, 0.85f), 8);
+                var rt = bar.rectTransform;
+                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                rt.pivot = new Vector2(0.5f, 0);
+                rt.anchoredPosition = new Vector2(0, 250);
+                rt.sizeDelta = new Vector2(16, 0);
+                bars[i] = rt;
+            }
+
             core = Ui.Image(center, "Core", Theme.Card, Icons.Circle);
             Ui.Center(core.rectTransform, new Vector2(460, 460));
-            coreIcon = Ui.Image(core.transform, "Icon", Theme.Text, Icons.Qr);
+            coreIcon = Ui.Image(core.transform, "Icon", Theme.Text, Icons.Mic);
             Ui.Center(coreIcon.rectTransform, new Vector2(180, 180));
+            Ui.HitArea(core.rectTransform, () => App.Mic.StartListening());     // ponowna prośba o mikrofon
 
             status = Ui.Text(Safe, "", Theme.TextLarge, Theme.Text, FontStyles.Bold, TextAlignmentOptions.Center);
             Ui.Center(status.rectTransform, new Vector2(1000, 90), new Vector2(0, -190));
+
+            var track = Ui.Card(Safe, "ProgressTrack", Theme.Card, 12);
+            progressTrack = track.rectTransform;
+            Ui.Center(progressTrack, new Vector2(760, 24), new Vector2(0, -262));
+            progressFill = Ui.Card(progressTrack, "Fill", Theme.Accent, 12).rectTransform;
+            progressFill.anchorMax = new Vector2(0, 1);
+
             hint = Ui.Text(Safe, "", Theme.TextSmall + 4, Theme.Muted, FontStyles.Normal, TextAlignmentOptions.Top);
-            Ui.Center(hint.rectTransform, new Vector2(900, 160), new Vector2(0, -320));
+            Ui.Center(hint.rectTransform, new Vector2(900, 160), new Vector2(0, -330));
 
             // ── przyciski ──
             var scan = Ui.Button(Safe, "Skanuj kod QR", Theme.Primary, Color.white, () => App.Show(App.Scan), Icons.Qr);
@@ -88,25 +119,79 @@ namespace Sygnet.App.UI
             areaLabel.text = Areas.Name(App.Store.UserArea);
             clockChip.gameObject.SetActive(App.TestClock);
             lastButton.gameObject.SetActive(App.Store.Inbox.Count > 0);
-            status.text = "Gotowy do odbioru";
-            hint.text = "Zeskanuj kod QR komunikatu\nz plakatu lub ekranu";
             UpdateClock();
         }
 
         public override void Tick()
         {
-            // spokojny „oddech” pierścieni
             float t = Time.unscaledTime;
-            Pulse(ring1, t % 2.4f / 2.4f);
-            Pulse(ring2, (t + 1.2f) % 2.4f / 2.4f);
+            var mic = App.Mic;
+            var dec = mic.Decoder;
+            bool listening = mic.Status == MicListener.State.Listening;
+            bool receiving = listening && dec != null && dec.Progress >= 0;
+
+            // pierścienie: spokojny „oddech”, mocniejszy przy głośnym dźwięku
+            float level = listening && dec != null ? Mathf.Clamp01(dec.Rms * 12f) : 0f;
+            smoothLevel = Mathf.Lerp(smoothLevel, level, 0.25f);
+            Color ringColor = mic.Status == MicListener.State.PermissionDenied ? Theme.Danger : Theme.Accent;
+            Pulse(ring1, t % 2.4f / 2.4f, ringColor, listening ? 0.35f + 0.4f * smoothLevel : 0.15f);
+            Pulse(ring2, (t + 1.2f) % 2.4f / 2.4f, ringColor, listening ? 0.35f + 0.4f * smoothLevel : 0.15f);
+
+            // widmo
+            for (int i = 0; i < BarCount; i++)
+            {
+                float target = 0;
+                if (listening && dec != null && dec.Rms > 0.002f)
+                    target = Mathf.Clamp01(Mathf.Sqrt((float)dec.Spectrum[i % dec.Spectrum.Length]) * 1.6f) * (0.3f + 0.7f * level);
+                barLevels[i] = Mathf.Lerp(barLevels[i], target, target > barLevels[i] ? 0.6f : 0.15f);
+                bars[i].sizeDelta = new Vector2(16, 8 + 130 * barLevels[i]);
+            }
+
+            core.color = receiving ? Theme.WithAlpha(Theme.Accent, 0.35f) : Theme.Card;
+            progressTrack.gameObject.SetActive(receiving);
+            if (receiving) progressFill.anchorMax = new Vector2(Mathf.Clamp01((float)dec.Progress), 1);
+            UpdateStatus(mic, receiving);
+
             if (App.TestClock && t > nextClockRefresh) UpdateClock();
         }
 
-        static void Pulse(Image ring, float phase)
+        void UpdateStatus(MicListener mic, bool receiving)
+        {
+            switch (mic.Status)
+            {
+                case MicListener.State.Listening when receiving:
+                    int pct = Mathf.RoundToInt((float)mic.Decoder.Progress * 100);
+                    status.text = "Odbieram… " + pct + "%";
+                    hint.text = "Komunikat dźwiękowy (" + mic.Decoder.ReceivingBytes + " B).\nNie zasłaniaj mikrofonu.";
+                    break;
+                case MicListener.State.Listening:
+                    status.text = "Nasłuchuję komunikatów…";
+                    hint.text = "Radio, megafon albo telefon sąsiada.\nMożesz też zeskanować kod QR.";
+                    break;
+                case MicListener.State.Paused:
+                    status.text = "Nadaję dźwiękiem…";
+                    hint.text = "Nasłuch wstrzymany na czas przekazywania.";
+                    break;
+                case MicListener.State.PermissionDenied:
+                    status.text = "Brak dostępu do mikrofonu";
+                    hint.text = "Dotknij okręgu i zezwól na mikrofon,\nżeby odbierać komunikaty dźwiękowe.";
+                    break;
+                case MicListener.State.NoMicrophone:
+                    status.text = "Brak mikrofonu";
+                    hint.text = "Komunikaty możesz odbierać z kodów QR.";
+                    break;
+                default:
+                    status.text = "Gotowy do odbioru";
+                    hint.text = "Zeskanuj kod QR komunikatu\nz plakatu lub ekranu";
+                    break;
+            }
+        }
+
+        static void Pulse(Image ring, float phase, Color color, float strength)
         {
             float s = 1f + 0.55f * phase;
             ring.rectTransform.localScale = new Vector3(s, s, 1);
-            ring.color = Theme.WithAlpha(Theme.Accent, 0.45f * (1f - phase));
+            ring.color = Theme.WithAlpha(color, strength * (1f - phase));
         }
 
         void UpdateClock()

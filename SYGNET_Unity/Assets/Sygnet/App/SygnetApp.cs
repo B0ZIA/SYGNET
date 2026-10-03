@@ -26,6 +26,7 @@ namespace Sygnet.App
         public Storage Store { get; private set; }
         public RelayPlayer Relay { get; private set; }
         public QrScanner Scanner { get; private set; }
+        public MicListener Mic { get; private set; }
 
         public HomeScreen Home { get; private set; }
         public ScanScreen Scan { get; private set; }
@@ -59,6 +60,10 @@ namespace Sygnet.App
             Relay.transform.SetParent(transform);
             Scanner = new GameObject("QrScanner", typeof(QrScanner)).GetComponent<QrScanner>();
             Scanner.transform.SetParent(transform);
+            Mic = new GameObject("MicListener", typeof(MicListener)).GetComponent<MicListener>();
+            Mic.transform.SetParent(transform);
+            Mic.FrameReceived += f => HandleFrame(f, FrameSource.Audio);
+            Relay.PlayingChanged += playing => Mic.Suspend(playing);    // telefon nie dekoduje sam siebie
 
             BuildCanvas();
             Home = Add(new HomeScreen(this, canvasRoot));
@@ -66,6 +71,7 @@ namespace Sygnet.App
             Result = Add(new ResultScreen(this, canvasRoot));
             BuildToast();
             Show(Home);
+            Mic.StartListening();
         }
 
         void LoadTrustStore()
