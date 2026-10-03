@@ -5,6 +5,13 @@
 > Implementacja referencyjna: `tools/sygnet_ref.py`. Wektory testowe: `testvectors/testvectors.json` + `*.wav`.
 > Bajty generowane przez konsolę muszą być **identyczne** z wektorami testowymi (Ed25519 jest deterministyczny).
 
+> **Stan (2026-10-03): L1–L8 zrobione** – szczegóły uruchomienia w `backend/README.md`.
+> `sygnet:testvectors` → ALL OK (także trust store bajt w bajt), modem JS = WAV-y z `testvectors/` (±1 LSB, `npm test`),
+> PHPUnit 27 testów. Sprawdzone na Pixelu przez głośnik laptopa: alarm z konsoli → ✅, A1 → 🟥, A3 → ⚠️, A5 → 🟥 NIEPEŁNY.
+> Poza specyfikacją: atak **A7** (skradziony, unieważniony klucz → `REVOKED_ISSUER`) i „kontrolna weryfikacja” –
+> konsola sprawdza każdą ramkę tą samą logiką co telefon (§7) i pokazuje wynik w podglądzie.
+> Certyfikat: `scope_count` i `name_len` to **u8** (PROTOCOL.md §5.3) – wcześniejsza wersja PHP miała u16.
+
 ## 1. Cel
 
 Aplikacja webowa uruchamiana **lokalnie na laptopie, w 100% offline**, z trzema częściami:
@@ -129,6 +136,7 @@ Czerwony motyw, nagłówek „🕵️ TRYB ATAKUJĄCEGO: klucze nieautoryzowane�
 | **A4 Przekroczenie uprawnień** | Prawdziwy klucz Prezydenta Warszawy podpisuje komunikat dla Krakowa | 🟥 FORGED `UNAUTHORIZED_AREA` |
 | **A5 Brak drugiego podpisu** | Ewakuacja podpisana tylko przez Wojewodę | 🟥 INCOMPLETE |
 | **A6 Nieznany nadawca** | `issuer_id = 42`, podpis kluczem hakera | 🟥 FORGED `UNKNOWN_ISSUER` |
+| **A7 Skradziony klucz** | Prawdziwy klucz wydawcy unieważnionego wcześniej przez ROOT (`/keys` → KEY_REVOKE) | 🟥 FORGED `REVOKED_ISSUER` |
 
 Ramki ataków budujemy **tą samą klasą `FrameBuilder`**. Atak różni się tylko kluczem lub zmodyfikowanymi bajtami. W bazie zapisujemy je jako `kind = 'attack'`.
 

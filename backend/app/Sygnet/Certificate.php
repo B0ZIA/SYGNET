@@ -4,211 +4,94 @@ namespace App\Sygnet;
 
 use InvalidArgumentException;
 
+/**
+ * Certyfikat wydawcy – bajty podpisywane przez ROOT (PROTOCOL.md §5.3):
+ * cert_version u8 | issuer_id u16 | pubkey 32 B | valid_from u32 | valid_until u32 | scope_count u8 | scopes u16[] | name_len u8 | name.
+ */
 final readonly class Certificate
 {
+    public const VERSION = 1;
+
+    /** @param int[] $scopes */
     public function __construct(
-        public int $version,
         public int $issuerId,
         public string $publicKey,
         public int $validFrom,
         public int $validUntil,
-        public array $areas,
+        public array $scopes,
         public string $name,
+        public int $version = self::VERSION,
     ) {
-        if ($version !== 1) {
-            throw new InvalidArgumentException('Unsupported certificate version.');
+        if ($version !== self::VERSION) {
+            throw new InvalidArgumentException('Nieobsługiwana wersja certyfikatu.');
         }
-
         if (strlen($publicKey) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
-            throw new InvalidArgumentException('Invalid certificate public key.');
+            throw new InvalidArgumentException('Zły klucz publiczny w certyfikacie.');
         }
-
         if ($issuerId < 0 || $issuerId > 0xFFFF) {
-            throw new InvalidArgumentException('Invalid issuer ID.');
+            throw new InvalidArgumentException('Złe ID wydawcy.');
         }
-
         if ($validUntil < $validFrom) {
-            throw new InvalidArgumentException(
-                'Certificate expiration precedes validity start.'
-            );
+            throw new InvalidArgumentException('Certyfikat wygasa przed datą ważności.');
         }
-
-        foreach ($areas as $area) {
-            if ($area < 0 || $area > 0xFFFF) {
-                throw new InvalidArgumentException(
-                    "Invalid certificate area {$area}."
-                );
+        if (count($scopes) > 0xFF || strlen($name) > 0xFF) {
+            throw new InvalidArgumentException('Za dużo zakresów albo za długa nazwa.');
+        }
+        foreach ($scopes as $scope) {
+            if ($scope < 0 || $scope > 0xFFFF) {
+                throw new InvalidArgumentException("Zły zakres {$scope}.");
             }
         }
     }
 
     public function toBytes(): string
     {
-        if (count($this->areas) > 0xFFFF) {
-            throw new InvalidArgumentException('Too many certificate areas.');
+        $bytes = pack('Cn', $this->version, $this->issuerId)
+            .$this->publicKey
+            .pack('NNC', $this->validFrom, $this->validUntil, count($this->scopes));
+
+        foreach ($this->scopes as $scope) {
+            $bytes .= pack('n', $scope);
         }
 
-        $nameLength = strlen($this->name);
-
-        if ($nameLength > 0xFFFF) {
-            throw new InvalidArgumentException('Certificate name is too long.');
-        }
-
-        $bytes =
-            pack('C', $this->version) .
-            pack('n', $this->issuerId) .
-            $this->publicKey .
-            pack('N', $this->validFrom) .
-            pack('N', $this->validUntil) .
-            pack('n', count($this->areas));
-
-        foreach ($this->areas as $area) {
-            $bytes .= pack('n', $area);
-        }
-
-        $bytes .= pack('n', $nameLength);
-        $bytes .= $this->name;
-
-        return $bytes;
-    }
-
-    public function toBase64(): string
-    {
-        return base64_encode($this->toBytes());
+        return $bytes.pack('C', strlen($this->name)).$this->name;
     }
 
     public static function fromBytes(string $bytes): self
     {
-        $length = strlen($bytes);
-        $offset = 0;
+        $n = strlen($bytes);
 
-        // Fixed part before AREA_COUNT:
-        // version 1
-        // issuer_id 2
-        // public_key 32
-        // valid_from 4
-        // valid_until 4
-        // = 43 bytes
-        if ($length < 45) {
-            throw new InvalidArgumentException('Certificate is too short.');
+        if ($n < 45) {
+            throw new InvalidArgumentException('Certyfikat jest za krótki.');
         }
 
-        $version = ord($bytes[$offset]);
-        $offset += 1;
+        $h = unpack('Cversion/nissuer', $bytes);
+        $t = unpack('Nfrom/Nuntil/Ccount', $bytes, 35);
+        $p = 44;
 
-        $issuer = unpack('nissuer', substr($bytes, $offset, 2));
-
-        if ($issuer === false) {
-            throw new InvalidArgumentException('Invalid certificate issuer ID.');
+        if ($p + 2 * $t['count'] + 1 > $n) {
+            throw new InvalidArgumentException('Certyfikat ucięty.');
         }
 
-        $issuerId = $issuer['issuer'];
-        $offset += 2;
-
-        $publicKey = substr($bytes, $offset, 32);
-
-        if (strlen($publicKey) !== 32) {
-            throw new InvalidArgumentException('Certificate public key is truncated.');
+        $scopes = [];
+        for ($i = 0; $i < $t['count']; $i++, $p += 2) {
+            $scopes[] = unpack('n', $bytes, $p)[1];
         }
 
-        $offset += 32;
+        $nameLen = ord($bytes[$p++]);
 
-        $validFromData = unpack('Nvalid_from', substr($bytes, $offset, 4));
-
-        if ($validFromData === false) {
-            throw new InvalidArgumentException('Invalid certificate valid_from.');
+        if ($p + $nameLen !== $n) {
+            throw new InvalidArgumentException('Zła długość nazwy w certyfikacie.');
         }
-
-        $validFrom = $validFromData['valid_from'];
-        $offset += 4;
-
-        $validUntilData = unpack('Nvalid_until', substr($bytes, $offset, 4));
-
-        if ($validUntilData === false) {
-            throw new InvalidArgumentException('Invalid certificate valid_until.');
-        }
-
-        $validUntil = $validUntilData['valid_until'];
-        $offset += 4;
-
-        // IMPORTANT:
-        // AREA_COUNT is u16 BE, at offset 43.
-        if ($length < $offset + 2) {
-            throw new InvalidArgumentException(
-                'Certificate is missing area count.'
-            );
-        }
-
-        $areaCountData = unpack('narea_count', substr($bytes, $offset, 2));
-
-        if ($areaCountData === false) {
-            throw new InvalidArgumentException(
-                'Invalid certificate area count.'
-            );
-        }
-
-        $areaCount = $areaCountData['area_count'];
-        $offset += 2;
-
-        // Every area is u16 BE.
-        $areas = [];
-
-        for ($i = 0; $i < $areaCount; $i++) {
-            if ($length < $offset + 2) {
-                throw new InvalidArgumentException(
-                    'Certificate area section is truncated.'
-                );
-            }
-
-            $areaData = unpack('narea', substr($bytes, $offset, 2));
-
-            if ($areaData === false) {
-                throw new InvalidArgumentException(
-                    'Invalid certificate area.'
-                );
-            }
-
-            $areas[] = $areaData['area'];
-            $offset += 2;
-        }
-
-        // NAME_LEN is u16 BE.
-        if ($length < $offset + 2) {
-            throw new InvalidArgumentException(
-                'Certificate is missing name length.'
-            );
-        }
-
-        $nameLengthData = unpack(
-            'nname_length',
-            substr($bytes, $offset, 2)
-        );
-
-        if ($nameLengthData === false) {
-            throw new InvalidArgumentException(
-                'Invalid certificate name length.'
-            );
-        }
-
-        $nameLength = $nameLengthData['name_length'];
-        $offset += 2;
-
-        if ($length !== $offset + $nameLength) {
-            throw new InvalidArgumentException(
-                'Certificate name length mismatch.'
-            );
-        }
-
-        $name = substr($bytes, $offset, $nameLength);
 
         return new self(
-            version: $version,
-            issuerId: $issuerId,
-            publicKey: $publicKey,
-            validFrom: $validFrom,
-            validUntil: $validUntil,
-            areas: $areas,
-            name: $name,
+            issuerId: $h['issuer'],
+            publicKey: substr($bytes, 3, 32),
+            validFrom: $t['from'],
+            validUntil: $t['until'],
+            scopes: $scopes,
+            name: substr($bytes, $p, $nameLen),
+            version: $h['version'],
         );
     }
 
@@ -217,11 +100,14 @@ final readonly class Certificate
         $bytes = base64_decode($value, true);
 
         if ($bytes === false) {
-            throw new InvalidArgumentException(
-                'Invalid certificate Base64.'
-            );
+            throw new InvalidArgumentException('Zły base64 certyfikatu.');
         }
 
         return self::fromBytes($bytes);
+    }
+
+    public function fingerprint(): string
+    {
+        return KeyStore::fingerprintOf($this->publicKey);
     }
 }

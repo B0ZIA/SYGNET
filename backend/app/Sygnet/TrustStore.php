@@ -3,120 +3,113 @@
 namespace App\Sygnet;
 
 use RuntimeException;
+use Throwable;
 
+/**
+ * Plik sygnet_trust_store.json (PROTOCOL.md §5.4) widziany tak jak przez aplikację: każdy certyfikat sprawdzany
+ * kluczem ROOT, odrzucone są logowane, a nazwa i zakres pochodzą wyłącznie z bajtów certyfikatu.
+ */
 final class TrustStore
 {
-    /**
-     * @var array<int, array{certificate: Certificate, rootSignature: string}>
-     */
-    private array $issuers = [];
+    /** @var array<int, Certificate> */
+    private array $certificates = [];
+
+    /** @var string[] */
+    private array $rejected = [];
 
     private function __construct(
-        private readonly string $rootFingerprint,
         private readonly string $rootPublicKey,
-    ) {
-    }
+        private readonly array $json,
+    ) {}
 
-    public static function fromFile(
-        string $path,
-        string $rootPublicKey
-    ): self {
-        if (!is_file($path)) {
-            throw new RuntimeException(
-                "Trust store not found: {$path}"
-            );
+    public static function fromArray(array $json, string $rootPublicKey): self
+    {
+        if (($json['version'] ?? null) !== 1) {
+            throw new RuntimeException('Nieobsługiwana wersja trust store.');
         }
 
-        $data = json_decode(
-            file_get_contents($path),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
+        $store = new self($rootPublicKey, $json);
 
-        if (($data['version'] ?? null) !== 1) {
-            throw new RuntimeException('Unsupported trust-store version.');
-        }
+        foreach ($json['issuers'] ?? [] as $i => $entry) {
+            try {
+                $bytes = base64_decode($entry['cert_b64'] ?? '', true);
+                $sig = base64_decode($entry['root_sig_b64'] ?? '', true);
+                if ($bytes === false || $sig === false || strlen($sig) !== SODIUM_CRYPTO_SIGN_BYTES
+                    || ! sodium_crypto_sign_verify_detached($sig, $bytes, $rootPublicKey)) {
+                    $store->rejected[] = "wpis {$i}: zły podpis ROOT";
 
-        $store = new self(
-            rootFingerprint: (string) ($data['root_fingerprint'] ?? ''),
-            rootPublicKey: $rootPublicKey,
-        );
-
-        foreach ($data['issuers'] ?? [] as $entry) {
-            $certificate = Certificate::fromBase64(
-                $entry['cert_b64']
-            );
-
-            $rootSignature = base64_decode(
-                $entry['root_sig_b64'],
-                true
-            );
-
-            if (
-                $rootSignature === false ||
-                strlen($rootSignature) !== SODIUM_CRYPTO_SIGN_BYTES
-            ) {
-                throw new RuntimeException(
-                    "Invalid ROOT signature for issuer {$certificate->issuerId}."
-                );
+                    continue;
+                }
+                $cert = Certificate::fromBytes($bytes);
+                $store->certificates[$cert->issuerId] = $cert;
+            } catch (Throwable $e) {
+                $store->rejected[] = "wpis {$i}: ".$e->getMessage();
             }
-
-            $store->issuers[$certificate->issuerId] = [
-                'certificate' => $certificate,
-                'rootSignature' => $rootSignature,
-            ];
         }
 
         return $store;
     }
 
+    public static function fromFile(string $path, string $rootPublicKey): self
+    {
+        if (! is_file($path)) {
+            throw new RuntimeException("Brak trust store: {$path}. Uruchom: php artisan sygnet:init");
+        }
+
+        return self::fromArray(json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR), $rootPublicKey);
+    }
+
+    public function rootPublicKey(): string
+    {
+        return $this->rootPublicKey;
+    }
+
     public function rootFingerprint(): string
     {
-        return $this->rootFingerprint;
+        return KeyStore::fingerprintOf($this->rootPublicKey);
+    }
+
+    /** Odcisk zapisany w pliku – musi się zgadzać z faktycznym kluczem ROOT. */
+    public function declaredRootFingerprint(): string
+    {
+        return (string) ($this->json['root_fingerprint'] ?? '');
     }
 
     public function hasIssuer(int $issuerId): bool
     {
-        return isset($this->issuers[$issuerId]);
+        return isset($this->certificates[$issuerId]);
     }
 
     public function certificate(int $issuerId): ?Certificate
     {
-        return $this->issuers[$issuerId]['certificate'] ?? null;
+        return $this->certificates[$issuerId] ?? null;
     }
 
-    public function rootSignature(int $issuerId): ?string
+    /** @return array<int, Certificate> */
+    public function certificates(): array
     {
-        return $this->issuers[$issuerId]['rootSignature'] ?? null;
+        ksort($this->certificates);
+
+        return $this->certificates;
     }
 
-    public function verifyCertificate(int $issuerId): bool
+    /** @return string[] */
+    public function rejected(): array
     {
-        $entry = $this->issuers[$issuerId] ?? null;
+        return $this->rejected;
+    }
 
-        if ($entry === null) {
-            return false;
+    public function nameOf(int $issuerId): ?string
+    {
+        if ($issuerId === KeyStore::ROOT) {
+            return config('sygnet.issuers.0.name');
         }
 
-        return sodium_crypto_sign_verify_detached(
-            $entry['rootSignature'],
-            $entry['certificate']->toBytes(),
-            $this->rootPublicKey
-        );
+        return $this->certificates[$issuerId]->name ?? null;
     }
 
-    public function isCertificateValid(
-        int $issuerId,
-        int $timestamp
-    ): bool {
-        $certificate = $this->certificate($issuerId);
-
-        if ($certificate === null) {
-            return false;
-        }
-
-        return $timestamp >= $certificate->validFrom
-            && $timestamp <= $certificate->validUntil;
+    public function toArray(): array
+    {
+        return $this->json;
     }
 }

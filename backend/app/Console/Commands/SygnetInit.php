@@ -2,94 +2,73 @@
 
 namespace App\Console\Commands;
 
+use App\Sygnet\Areas;
+use App\Sygnet\IssuerRegistry;
 use App\Sygnet\KeyStore;
+use App\Sygnet\TestVectors;
+use App\Sygnet\TrustStoreExporter;
 use Illuminate\Console\Command;
-use RuntimeException;
 
+/**
+ * Klucze ROOT, wydawców i HAKERA + eksport trust store i RootKey.cs dla aplikacji (CONSOLE_LARAVEL.md §5.1).
+ */
 class SygnetInit extends Command
 {
     protected $signature = 'sygnet:init
-                            {--test-seeds : Install protocol test-vector seeds}
-                            {--force : Overwrite existing seed files}';
+                            {--test-seeds : Seedy testowe z PROTOCOL.md §9 (zgodne z wektorami i obecną aplikacją testową)}
+                            {--force : Nadpisz istniejące klucze}';
 
-    protected $description = 'Initialize SYGNET keys and trust-store material';
+    protected $description = 'Generuje klucze SYGNET i eksportuje trust store + RootKey.cs dla aplikacji';
 
-    public function handle(): int
+    public function handle(IssuerRegistry $issuers): int
     {
-        $keyStore = KeyStore::fromConfig();
+        $keys = KeyStore::fromConfig();
+
+        if ($keys->has(KeyStore::ROOT) && ! $this->option('force')) {
+            $this->warn('Klucze już istnieją (ROOT '.$keys->fingerprint(KeyStore::ROOT).').');
+            $this->line('Nowe klucze unieważnią zaufanie telefonów z obecnym ROOT. Jeśli na pewno: <comment>--force</comment>');
+
+            return self::FAILURE;
+        }
+
+        foreach (glob($keys->directory().DIRECTORY_SEPARATOR.'*.seed') ?: [] as $old) {
+            unlink($old);
+        }
 
         if ($this->option('test-seeds')) {
-            return $this->installTestSeeds($keyStore);
-        }
-
-        $this->error(
-            'Normal production/demo initialization is not implemented yet.'
-        );
-
-        return self::FAILURE;
-    }
-
-    private function installTestSeeds(KeyStore $keyStore): int
-    {
-        $path = storage_path('app/keys/testvectors.json');
-
-        if (!is_file($path)) {
-            $this->error("Missing test vectors: {$path}");
-            return self::FAILURE;
-        }
-
-        $vectors = json_decode(
-            file_get_contents($path),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
-
-        $seeds = $vectors['seeds_hex'] ?? null;
-
-        if (!is_array($seeds)) {
-            $this->error('testvectors.json does not contain seeds_hex.');
-            return self::FAILURE;
-        }
-
-        foreach ($seeds as $issuerId => $seedHex) {
-            /*
-             * "hacker" is intentionally stored separately under
-             * hacker.seed. It is needed by the attack laboratory.
-             */
-            $filename = $issuerId === 'hacker'
-                ? 'hacker.seed'
-                : "{$issuerId}.seed";
-
-            $seed = hex2bin($seedHex);
-
-            if ($seed === false || strlen($seed) !== 32) {
-                throw new RuntimeException(
-                    "Invalid test seed for {$issuerId}."
-                );
+            TestVectors::load()->installSeeds($keys);
+            [$from, $until] = [TestVectors::CERT_FROM, TestVectors::CERT_UNTIL];
+            $note = 'Klucze TESTOWE (seedy z PROTOCOL.md §9) – NIE do prawdziwego demo.';
+        } else {
+            foreach (array_keys($issuers->all()) as $id) {
+                $keys->saveSeed($id, random_bytes(SODIUM_CRYPTO_SIGN_SEEDBYTES));
             }
-
-            $target = storage_path("app/keys/{$filename}");
-
-            if (is_file($target) && !$this->option('force')) {
-                $this->line(
-                    "<comment>SKIP</comment> {$filename} already exists"
-                );
-
-                continue;
-            }
-
-            $keyStore->saveSeed(
-                $issuerId === 'hacker' ? 'hacker' : (int) $issuerId,
-                $seed
-            );
-
-            $this->info("Installed {$filename}");
+            $keys->saveSeed(KeyStore::HACKER, random_bytes(SODIUM_CRYPTO_SIGN_SEEDBYTES));
+            $from = strtotime('today UTC');
+            $until = strtotime('+'.config('sygnet.cert_valid_years').' years', $from);
+            $note = 'Klucze demo wygenerowane '.gmdate('Y-m-d H:i').' UTC (losowe seedy).';
         }
 
+        $paths = TrustStoreExporter::fromConfig()->export($from, $until, $note);
+
+        $rows = [];
+        foreach ($issuers->issuers() as $id => $issuer) {
+            $rows[] = [
+                $id,
+                $issuer['name'],
+                implode(', ', array_map(fn ($s) => Areas::name($s), $issuer['scopes'])),
+                $keys->has($id) ? $keys->fingerprint($id) : '– (brak klucza testowego)',
+            ];
+        }
+        $this->table(['ID', 'Wydawca', 'Zakres', 'Odcisk klucza'], $rows);
+        $this->line('Certyfikaty ważne: '.gmdate('Y-m-d', $from).' – '.gmdate('Y-m-d', $until));
+        $this->line('Klucz HAKERA (poza trust store): '.$keys->fingerprint(KeyStore::HACKER));
         $this->newLine();
-        $this->info('Test-vector seeds installed.');
-        $this->line('These seeds are for protocol tests only.');
+        $this->line('  <options=bold>ODCISK ROOT:  '.$keys->fingerprint(KeyStore::ROOT).'</>');
+        $this->newLine();
+        $this->info('Eksport dla Unity:');
+        $this->line('  '.$paths['trust_store'].'  →  SYGNET_Unity/Assets/Resources/sygnet_trust_store.json');
+        $this->line('  '.$paths['root_key'].'  →  SYGNET_Unity/Assets/Sygnet/App/RootKey.cs');
 
         return self::SUCCESS;
     }

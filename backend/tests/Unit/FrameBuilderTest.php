@@ -3,134 +3,56 @@
 namespace Tests\Unit;
 
 use App\Sygnet\FrameBuilder;
-use App\Sygnet\KeyStore;
 use App\Sygnet\Payload;
+use Tests\Concerns\UsesTestKeys;
 use Tests\TestCase;
 
 class FrameBuilderTest extends TestCase
 {
-    public function test_tv1_frame_is_byte_for_byte_identical(): void
+    use UsesTestKeys;
+
+    public function test_tv1_tv6_are_byte_for_byte_identical(): void
     {
-        $vectors = json_decode(
-            file_get_contents(storage_path('app/keys/testvectors.json')),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
+        $keys = $this->installTestKeys();
 
-        $payloadHex = $vectors['vectors']['TV1_air_raid_single']['payload_hex'];
-        $expectedFrameHex = $vectors['vectors']['TV1_air_raid_single']['frame_hex'];
-
-        $payloadBytes = hex2bin($payloadHex);
-
-        $payload = $this->payloadFromBytes($payloadBytes);
-
-        $builder = new FrameBuilder(
-            KeyStore::fromConfig()
-        );
-
-        $frame = $builder->build($payload, [1]);
-
-        $this->assertSame(
-            $expectedFrameHex,
-            bin2hex($frame)
-        );
+        foreach ($this->vectors->rebuild($keys) as $name => $tv) {
+            $expected = $this->vectors->json['vectors'][$name];
+            $this->assertSame($expected['payload_hex'], bin2hex($tv['payload']), $name);
+            $this->assertSame($expected['frame_hex'], bin2hex($tv['frame']), $name);
+            $this->assertSame($expected['qr_text'], FrameBuilder::qrText($tv['frame']), $name);
+        }
     }
 
-    public function test_tv2_frame_is_byte_for_byte_identical(): void
+    public function test_frame_parses_back(): void
     {
-        $vectors = json_decode(
-            file_get_contents(storage_path('app/keys/testvectors.json')),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
+        $keys = $this->installTestKeys();
+        $payload = new Payload(3, 3, 1465, 1791076320, 240, 7, 'Kierunek: Grodzisk Maz.');
+        $frame = (new FrameBuilder($keys))->build($payload, [3, 5]);
 
-        $payloadHex = $vectors['vectors']['TV2_evacuation_dual']['payload_hex'];
-        $expectedFrameHex = $vectors['vectors']['TV2_evacuation_dual']['frame_hex'];
-
-        $payloadBytes = hex2bin($payloadHex);
-
-        $payload = $this->payloadFromBytes($payloadBytes);
-
-        $builder = new FrameBuilder(
-            KeyStore::fromConfig()
-        );
-
-        $frame = $builder->build($payload, [3, 5]);
-
-        $this->assertSame(
-            $expectedFrameHex,
-            bin2hex($frame)
-        );
+        $parsed = FrameBuilder::parse($frame);
+        $this->assertEquals($payload, $parsed['payload']);
+        $this->assertSame([3, 5], array_column($parsed['signatures'], 0));
+        $this->assertSame(155 + strlen($payload->note), strlen($frame));          // PROTOCOL.md §3
+        $this->assertSame($frame, FrameBuilder::fromQrText(FrameBuilder::qrText($frame)));
     }
 
-    public function test_tv1_qr_is_byte_for_byte_identical(): void
+    public function test_genuine_signatures_verify_and_hacker_ones_do_not(): void
     {
-        $vectors = json_decode(
-            file_get_contents(storage_path('app/keys/testvectors.json')),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
+        $keys = $this->installTestKeys();
+        $tvs = $this->vectors->rebuild($keys);
 
-        $payload = $this->payloadFromBytes(
-            hex2bin(
-                $vectors['vectors']['TV1_air_raid_single']['payload_hex']
-            )
-        );
-
-        $builder = new FrameBuilder(
-            KeyStore::fromConfig()
-        );
-
-        $frame = $builder->build($payload, [1]);
-
-        $this->assertSame(
-            $vectors['vectors']['TV1_air_raid_single']['qr_text'],
-            $builder->qrText($frame)
-        );
+        foreach (['TV1_air_raid_single' => true, 'TV3_forged_hacker_as_1' => false, 'TV6_tampered_note' => false] as $name => $ok) {
+            $f = FrameBuilder::parse($tvs[$name]['frame']);
+            [$signer, $sig] = $f['signatures'][0];
+            $this->assertSame($ok, sodium_crypto_sign_verify_detached($sig, $f['payload_bytes'], $keys->publicKey($signer)), $name);
+        }
     }
 
-    private function payloadFromBytes(string $bytes): Payload
+    public function test_audio_seconds_match_vectors(): void
     {
-        $offset = 0;
-
-        $version = ord($bytes[$offset++]);
-        $issuerId = unpack('n', substr($bytes, $offset, 2))[1];
-        $offset += 2;
-
-        $type = ord($bytes[$offset++]);
-
-        $areaCode = unpack('n', substr($bytes, $offset, 2))[1];
-        $offset += 2;
-
-        $timestamp = unpack('N', substr($bytes, $offset, 4))[1];
-        $offset += 4;
-
-        $validMinutes = unpack('n', substr($bytes, $offset, 2))[1];
-        $offset += 2;
-
-        $sequence = unpack('n', substr($bytes, $offset, 2))[1];
-        $offset += 2;
-
-        $reserved = ord($bytes[$offset++]);
-
-        $noteLength = ord($bytes[$offset++]);
-
-        $note = substr($bytes, $offset, $noteLength);
-
-        $this->assertSame(1, $version);
-        $this->assertSame(0, $reserved);
-
-        return new Payload(
-            issuerId: $issuerId,
-            type: $type,
-            areaCode: $areaCode,
-            timestamp: $timestamp,
-            validMinutes: $validMinutes,
-            sequence: $sequence,
-            note: $note,
-        );
+        $this->installTestKeys();
+        foreach ($this->vectors->json['vectors'] as $name => $tv) {
+            $this->assertEqualsWithDelta($tv['audio_seconds'], FrameBuilder::audioSeconds($tv['frame_len'], 2), 0.01, $name);
+        }
     }
 }

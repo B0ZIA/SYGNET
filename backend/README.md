@@ -1,58 +1,95 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SYGNET – konsola nadawcza i laboratorium ataków
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikacja Laravel uruchamiana **lokalnie na laptopie, w 100% offline** (`docs/CONSOLE_LARAVEL.md`).
+Operator tworzy komunikat, serwer podpisuje go Ed25519 (ext-sodium), a przeglądarka nadaje go **dźwiękiem**
+(modem JS, Web Audio), pokazuje **kod QR** albo zapisuje **WAV**. Format bajtów: `docs/PROTOCOL.md`.
 
-## About Laravel
+| Strona | Co robi |
+|---|---|
+| `/console` | formularz (nadawca, typ, obszar w zakresie nadawcy, ważność, dopisek ≤ 60 B UTF-8), podgląd telefonu na żywo, nadawanie dźwiękiem z wizualizacją tonów, QR, WAV, ramka hex w kolorach, historia |
+| `/attack` | laboratorium A1–A7: podszycie, modyfikacja, powtórka, przekroczenie uprawnień, brak 2. podpisu, nieznany nadawca, skradziony unieważniony klucz – każdy z oczekiwanym wynikiem i kontrolną weryfikacją |
+| `/keys` | odcisk ROOT, wydawcy i certyfikaty, unieważnianie (KEY_REVOKE od ROOT), pobranie `sygnet_trust_store.json` i `RootKey.cs` dla aplikacji |
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+„Kontrolna weryfikacja” to ta sama logika co w telefonie (`FrameVerifier`, PROTOCOL.md §7) na wyeksportowanym
+trust store – konsola pokazuje, co zobaczy telefon odbiorcy (domyślnie w Krakowie, `SYGNET_USER_AREA`).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Instalacja (raz, z internetem)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Wymagania: PHP ≥ 8.3 z rozszerzeniami `sodium`, `pdo_sqlite`, `mbstring`, `openssl`, `fileinfo`; Composer; Node ≥ 20.
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate
+npm install
+npm run build
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Windows: PHP z `winget install PHP.PHP.8.4` nie ma `php.ini` – skopiuj `php.ini-development` do `php.ini`
+i włącz `extension_dir = "ext"` oraz `extension=sodium`, `pdo_sqlite`, `sqlite3`, `mbstring`, `openssl`, `fileinfo`, `curl`, `zip`.
 
-## Contributing
+Po `npm run build` wszystko (fonty, JS, CSS) jest w `public/build` – konsola nie potrzebuje już sieci, zero CDN.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Klucze
 
-## Code of Conduct
+```bash
+php artisan sygnet:testvectors          # TV1–TV6 bajt w bajt jak testvectors.json → ALL OK
+php artisan sygnet:init --test-seeds    # klucze testowe z PROTOCOL.md §9 (wydawcy 1, 3, 5, 6 + HAKER)
+php artisan sygnet:init --force         # NOWE losowe klucze na demo: ROOT, wydawcy 1–7, HAKER
+php artisan sygnet:seed-history         # prawdziwe komunikaty sprzed 3 dni (materiał do ataku A3)
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+`sygnet:init` zapisuje seedy do `storage/app/keys/*.seed` (0600, poza gitem) i eksportuje dla Unity:
 
-## Security Vulnerabilities
+- `storage/app/export/sygnet_trust_store.json` → `SYGNET_Unity/Assets/Resources/sygnet_trust_store.json`
+- `storage/app/export/RootKey.cs` → `SYGNET_Unity/Assets/Sygnet/App/RootKey.cs`
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Po podmianie trzeba zbudować APK od nowa. Nowe klucze = telefony ze starym ROOT odrzucą wszystko (tak ma być).
 
-## License
+## Uruchomienie
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+php artisan serve        # http://127.0.0.1:8000 → /console
+```
+
+Na demo: projektor 1920×1080, głośność laptopa ~70%, telefon 0,5–2 m od głośnika. Przeglądarka wymaga
+kliknięcia, zanim zagra dźwięk – przycisk „Nadaj dźwiękiem” to załatwia.
+
+## API (JSON, sesja + CSRF)
+
+| Metoda | Ścieżka | Treść |
+|---|---|---|
+| `POST` | `/api/broadcast` | `{issuer_id, type, area_code, valid_minutes, note, second_signer_id?, second_pin?}` → ramka, QR, check |
+| `POST` | `/api/attack/{A1..A7}` | parametry ataku (opcjonalne) → ramka + `expected` + `as_expected` |
+| `POST` | `/api/revoke` | `{issuer_id}` → KEY_REVOKE podpisany przez ROOT |
+| `GET` | `/api/broadcasts?limit=20&kind=genuine` | historia |
+
+Walidacja (422): dopisek > 60 B lub ze znakami sterującymi, obszar poza zakresem nadawcy, brak klucza,
+klucz unieważniony, ewakuacja bez drugiego, uprawnionego wydawcy albo bez PIN-u drugiego operatora (`1234` na demo).
+W laboratorium ataków te reguły nie obowiązują – tam weryfikuje dopiero telefon.
+
+## Testy
+
+```bash
+php artisan test     # PHPUnit: CRC, wektory TV1–TV6, certyfikaty, weryfikacja §7, API, walidacja, ataki A1–A7
+npm test             # modem JS = pliki testvectors/*.wav (±1 LSB), WAV, zaokrąglanie przy 44,1 kHz
+```
+
+## Bezpieczeństwo
+
+- Klucze prywatne nigdy nie trafiają do przeglądarki – podpisuje wyłącznie backend; przeglądarka dostaje gotowe bajty.
+- Seedy nie są logowane; eksport zawiera tylko klucze publiczne.
+- Na demo klucze leżą w plikach. **Produkcyjnie:** HSM / karta kryptograficzna u każdego operatora, ROOT offline.
+- Typy krytyczne wymagają dwóch podpisów różnych wydawców – ta reguła jest zaszyta w aplikacji, nie w ramce.
+
+## Struktura
+
+```
+app/Sygnet/          Crc16, Payload, FrameBuilder, KeyStore, Certificate(Builder), TrustStore(Exporter),
+                     FrameVerifier, Areas, AlertTypes, IssuerRegistry, Broadcaster, AttackFactory, TestVectors
+app/Console/Commands sygnet:init, sygnet:testvectors, sygnet:seed-history
+resources/js/        sygnet-modem.js (encode/play/toWav), waveform.js, phone.js, frame.js, app.js (Alpine)
+resources/views/     console, attack, keys + components/layout, transmit, partials/phone, hex, qr-modal
+```

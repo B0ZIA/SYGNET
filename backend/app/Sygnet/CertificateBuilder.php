@@ -2,59 +2,36 @@
 
 namespace App\Sygnet;
 
-use InvalidArgumentException;
-
+/**
+ * Certyfikat wydawcy podpisany kluczem ROOT (PROTOCOL.md §5.3) → wpis trust store (§5.4).
+ */
 final class CertificateBuilder
 {
     public function __construct(
         private readonly KeyStore $keys
-    ) {
-    }
+    ) {}
 
     /**
-     * Builds a certificate signed by ROOT (issuer 0).
-     *
-     * @param int[] $areas
+     * @param  int[]  $scopes
      * @return array{cert: Certificate, cert_b64: string, root_sig_b64: string}
      */
-    public function build(
-        int $issuerId,
-        string $name,
-        array $areas,
-        int $validFrom,
-        int $validUntil,
-    ): array {
-        if ($issuerId < 0 || $issuerId > 0xFFFF) {
-            throw new InvalidArgumentException('Invalid issuer ID.');
-        }
-
-        if ($validUntil < $validFrom) {
-            throw new InvalidArgumentException(
-                'Certificate expiration precedes validity start.'
-            );
-        }
-
+    public function build(int $issuerId, string $name, array $scopes, int $validFrom, int $validUntil): array
+    {
         $certificate = new Certificate(
-            version: 1,
             issuerId: $issuerId,
             publicKey: $this->keys->publicKey($issuerId),
             validFrom: $validFrom,
             validUntil: $validUntil,
-            areas: array_map('intval', $areas),
+            scopes: array_map('intval', $scopes),
             name: $name,
         );
 
-        $certBytes = $certificate->toBytes();
-
-        $rootSignature = $this->keys->sign(
-            0,
-            $certBytes
-        );
+        $bytes = $certificate->toBytes();
 
         return [
             'cert' => $certificate,
-            'cert_b64' => base64_encode($certBytes),
-            'root_sig_b64' => base64_encode($rootSignature),
+            'cert_b64' => base64_encode($bytes),
+            'root_sig_b64' => base64_encode($this->keys->sign(KeyStore::ROOT, $bytes)),
         ];
     }
 }

@@ -2,43 +2,22 @@
 
 namespace App\Sygnet;
 
+/**
+ * Kody obszarów TERYT (PROTOCOL.md §6): 0 = Polska, 1..99 = województwo, 100..9999 = powiat.
+ */
 final class Areas
 {
-    /**
-     * @param int[] $allowedAreas
-     */
-    public static function covers(
-        array $allowedAreas,
-        int $targetArea
-    ): bool {
-        foreach ($allowedAreas as $allowed) {
-            $allowed = (int) $allowed;
+    /** Czy obszar $c obejmuje obszar $a: covers(c, a) = c == 0 || c == a || (c < 100 && a / 100 == c). */
+    public static function covers(int $c, int $a): bool
+    {
+        return $c === 0 || $c === $a || ($c < 100 && intdiv($a, 100) === $c);
+    }
 
-            /*
-             * 0 = entire Poland
-             */
-            if ($allowed === 0) {
-                return true;
-            }
-
-            /*
-             * Exact area.
-             */
-            if ($allowed === $targetArea) {
-                return true;
-            }
-
-            /*
-             * Province -> city.
-             *
-             * Mazowieckie 14 covers Warsaw 1465.
-             * Małopolskie 12 covers Kraków 1261.
-             */
-            if ($allowed === 14 && $targetArea === 1465) {
-                return true;
-            }
-
-            if ($allowed === 12 && $targetArea === 1261) {
+    /** Czy któryś z zakresów wydawcy obejmuje obszar (uprawnienie do podpisu). */
+    public static function anyCovers(array $scopes, int $area): bool
+    {
+        foreach ($scopes as $scope) {
+            if (self::covers((int) $scope, $area)) {
                 return true;
             }
         }
@@ -46,15 +25,20 @@ final class Areas
         return false;
     }
 
-    public static function name(int $areaCode): string
+    /** @return array<int, string> */
+    public static function all(): array
     {
-        return match ($areaCode) {
-            0 => 'Polska',
-            14 => 'woj. mazowieckie',
-            12 => 'woj. małopolskie',
-            1465 => 'Warszawa',
-            1261 => 'Kraków',
-            default => "Obszar {$areaCode}",
-        };
+        return config('sygnet.areas', []);
+    }
+
+    public static function name(int $code): string
+    {
+        $areas = self::all();
+
+        if (isset($areas[$code])) {
+            return $areas[$code];
+        }
+
+        return $code < 100 ? sprintf('województwo %02d', $code) : sprintf('powiat %04d', $code);
     }
 }
