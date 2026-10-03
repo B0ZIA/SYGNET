@@ -8,15 +8,16 @@ using UnityEngine.UI;
 namespace Sygnet.App
 {
     /// <summary>
-    /// Kamień milowy U1: pusta aplikacja, która na telefonie dowodzi, że IL2CPP nie wyciął BouncyCastle
-    /// (Ed25519 z seeda testowego ROOT daje odcisk 6A38-03D5-F059-902A z PROTOCOL.md §9).
-    /// Zostanie zastąpiona przez SygnetApp w U4.
+    /// Ekran rozruchowy U1–U2: na telefonie dowodzi, że IL2CPP nie wyciął BouncyCastle i że Sygnet.Core
+    /// (TrustStore z Resources + Verifier) daje te same wyniki co testy EditMode.
+    /// Zostanie zastąpiony przez SygnetApp w U4.
     /// </summary>
     public class BootCheck : MonoBehaviour
     {
-        // Klucz publiczny ROOT z testvectors.json (seed 0x02×32). Tylko do testów.
-        const string TestRootPubB64 = "gTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=";
-        const string TestRootFingerprint = "6A38-03D5-F059-902A";
+        // QR wektorów TV1 (VERIFIED) i TV3 (FORGED BAD_SIGNATURE:1) z testvectors.json; now_for_tests, user_area 1465.
+        const string Tv1Qr = "SYG1:U0cAcgEAAQEFuWrBp-AAeAABAB1TY2hyb246IG1ldHJvIMWad2nEmXRva3J6eXNrYQEAAWlOyixH4xDKCe3jR-e4a4reIZcc6iB1viusomY6oW-4mGmvg5bbDme4SEksA9ed5dkZCxNeiDkMMtGhIi2YjQbucw";
+        const string Tv3Qr = "SYG1:U0cAcgEAAQEFuWrBp-AAeAABAB1TY2hyb246IG1ldHJvIMWad2nEmXRva3J6eXNrYQEAAdHBYoZyeVSsMYW_7OCwdUrPmqnGNRLp6vPK_vD4RpZDuwEgJAr3bWXiomv_v9fW3qKlhdM8NwNYelEZgUFZyg0Zug";
+        const long NowForTests = 1791076920;
 
         static readonly Color Bg = Hex("#0B0F14");
         static readonly Color Card = Hex("#151B23");
@@ -25,7 +26,7 @@ namespace Sygnet.App
         void Start()
         {
             var report = RunSelfTest(out bool ok);
-            Debug.Log("[SYGNET] U1 self-test " + (ok ? "OK" : "FAIL") + "\n" + report);
+            Debug.Log("[SYGNET] self-test " + (ok ? "OK" : "FAIL") + "\n" + report);
             BuildUi(report, ok);
         }
 
@@ -35,23 +36,21 @@ namespace Sygnet.App
             ok = true;
             try
             {
-                var seed = Fill(0x02, 32);
-                var pub = Ed25519.PublicKeyFromSeed(seed);
-                bool pubOk = Convert.ToBase64String(pub) == TestRootPubB64;
-                var fp = Ed25519.Fingerprint(pub);
-                bool fpOk = fp == TestRootFingerprint;
-                Line(sb, pubOk && fpOk, "Klucz ROOT (testowy): " + fp);
+                var rootPub = RootKey.PublicKey;
+                var fp = Ed25519.Fingerprint(rootPub);
+                bool fpOk = fp == RootKey.Fingerprint;
+                Line(sb, fpOk, "Klucz ROOT" + (RootKey.IsTestKey ? " (testowy)" : "") + ": " + fp);
 
-                var msg = Encoding.UTF8.GetBytes("Schron: metro Świętokrzyska");
-                var sig = Ed25519.Sign(seed, msg);
-                bool verOk = Ed25519.Verify(pub, msg, sig);
-                Line(sb, verOk, "Podpis Ed25519 i weryfikacja");
+                var json = Resources.Load<TextAsset>("sygnet_trust_store");
+                var trust = TrustStore.FromJson(json.text, rootPub);
+                foreach (var why in trust.Rejected) Debug.LogWarning("[SYGNET] Odrzucony certyfikat: " + why);
+                bool trustOk = trust.Issuers.Count > 0 && trust.Rejected.Count == 0;
+                Line(sb, trustOk, "Zaufani wydawcy: " + trust.Issuers.Count + ", odrzuceni: " + trust.Rejected.Count);
 
-                msg[0] ^= 1;
-                bool tamperOk = !Ed25519.Verify(pub, msg, sig);
-                Line(sb, tamperOk, "Zmieniony bajt → podpis odrzucony");
+                bool tv1Ok = CheckQr(sb, trust, Tv1Qr, "TV1", VerifyStatus.Verified, "OK");
+                bool tv3Ok = CheckQr(sb, trust, Tv3Qr, "TV3", VerifyStatus.Forged, "BAD_SIGNATURE:1");
 
-                ok = pubOk && fpOk && verOk && tamperOk;
+                ok = fpOk && trustOk && tv1Ok && tv3Ok;
             }
             catch (Exception e)
             {
@@ -130,6 +129,20 @@ namespace Sygnet.App
             status.alignment = TextAlignmentOptions.Center;
         }
 
+        static bool CheckQr(StringBuilder sb, TrustStore trust, string qr, string label, VerifyStatus expected, string reason)
+        {
+            if (!Frame.TryFromQrText(qr, out var frame))
+            {
+                Line(sb, false, label + ": nieczytelny QR");
+                return false;
+            }
+            var r = Verifier.Verify(frame, trust, NowForTests, 1465, null, null);
+            bool ok = r.Status == expected && r.ReasonCode == reason;
+            var what = r.Payload != null ? AlertTypes.Get(r.Payload.Type).Name + ", " + r.IssuerName : "";
+            Line(sb, ok, label + " → " + Messages.Title(r.Status) + " <size=80%>(" + r.ReasonCode + ")</size>\n      <size=80%>" + what + "</size>");
+            return ok;
+        }
+
         static void Line(StringBuilder sb, bool ok, string text)
         {
             sb.Append(ok ? "<color=#3FB950>OK</color>   " : "<color=#FF6B6B>BŁĄD</color>   ");
@@ -157,13 +170,6 @@ namespace Sygnet.App
             t.color = Text;
             t.textWrappingMode = TextWrappingModes.Normal;
             return t;
-        }
-
-        static byte[] Fill(byte b, int n)
-        {
-            var a = new byte[n];
-            for (int i = 0; i < n; i++) a[i] = b;
-            return a;
         }
 
         static Color Hex(string hex)

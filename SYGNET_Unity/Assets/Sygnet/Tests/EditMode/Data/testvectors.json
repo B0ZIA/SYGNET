@@ -1,0 +1,117 @@
+{
+  "_info": "SYGNET v1 test vectors. Klucze to seedy testowe - NIE używać produkcyjnie.",
+  "now_for_tests": 1791076920,
+  "now_expired": 1791335520,
+  "user_area": 1465,
+  "seeds_hex": {
+    "0": "0202020202020202020202020202020202020202020202020202020202020202",
+    "1": "0101010101010101010101010101010101010101010101010101010101010101",
+    "3": "0303030303030303030303030303030303030303030303030303030303030303",
+    "5": "0505050505050505050505050505050505050505050505050505050505050505",
+    "6": "0606060606060606060606060606060606060606060606060606060606060606",
+    "hacker": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "root_pub_hex": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+  "root_pub_b64": "gTl3Dqh9F19Wo1Rmw0x+zMuNipG07jeiXfYPW4/Js5Q=",
+  "root_fingerprint": "6A38-03D5-F059-902A",
+  "issuer_pub_hex": {
+    "1": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "3": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
+    "5": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1",
+    "6": "8a875fff1eb38451577acd5afee405456568dd7c89e090863a0557bc7af49f17"
+  },
+  "trust_store": {
+    "version": 1,
+    "root_fingerprint": "6A38-03D5-F059-902A",
+    "issuers": [
+      {
+        "cert_b64": "AQABiojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1xpVbkAbRggAAEAABlEb3fDs2R6dHdvIE9wZXJhY3lqbmUgUlNa",
+        "root_sig_b64": "s2Vp8alTf2bbxPJonOiMjU2ii7Kf/+iul8Shxzpp5TJNul4OIWRj11EnJHUZUBh7Xwbh1mnTRqeobgqJQYXYBQ=="
+      },
+      {
+        "cert_b64": "AQAD7UkoxijRwsbq6QM4kFmVYSlZJzpcY/k2NsFGFKyHN9FpVbkAbRggAAEADhNXb2pld29kYSBNYXpvd2llY2tp",
+        "root_sig_b64": "aNnotxv/u32CPSg3UsOuLpgz/SZsBLCabAl/KQFiU4Py7IwYs4Snu9QuIsc7FtUcOemCpwCpLl3nAOOd9o7jAQ=="
+      },
+      {
+        "cert_b64": "AQAFbnoc3Smwt4/ROvTFWY/v9O8qlxZuPKby5Pv8zYBQW/FpVbkAbRggAAEADiJLb21lbmRhbnQgV29qZXfDs2R6a2kgUFNQIE1hem93c3pl",
+        "root_sig_b64": "opuAc+VQ9h1RO0nVmojperB0cvKblyzXpRpRq1V3ZnOQS+Scs5ReUoIixRDtr7kxWbcyJqeaovPRw5G6IDV2Ag=="
+      },
+      {
+        "cert_b64": "AQAGiodf/x6zhFFXes1a/uQFRWVo3XyJ4JCGOgVXvHr0nxdpVbkAbRggAAEFuRhQcmV6eWRlbnQgbS5zdC4gV2Fyc3phd3k=",
+        "root_sig_b64": "kwW090mtQMV6MKQ77X8UKjU7flDh2yKn6TjxylEfeQqMoB2gtZ2xqNoe9rdmxZMfhrs/d/tDndpep6BIHT6ICQ=="
+      }
+    ]
+  },
+  "crc16_check": {
+    "input_ascii": "123456789",
+    "crc_hex": "29B1"
+  },
+  "vectors": {
+    "TV1_air_raid_single": {
+      "payload_hex": "0100010105b96ac1a7e000780001001d536368726f6e3a206d6574726f20c59a7769c499746f6b727a79736b61",
+      "frame_hex": "534700720100010105b96ac1a7e000780001001d536368726f6e3a206d6574726f20c59a7769c499746f6b727a79736b61010001694eca2c47e310ca09ede347e7b86b8ade21971cea2075be2baca2663aa16fb89869af8396db0e67b848492c03d79de5d9190b135e88390c32d1a1222d988d06ee73",
+      "frame_len": 118,
+      "qr_text": "SYG1:U0cAcgEAAQEFuWrBp-AAeAABAB1TY2hyb246IG1ldHJvIMWad2nEmXRva3J6eXNrYQEAAWlOyixH4xDKCe3jR-e4a4reIZcc6iB1viusomY6oW-4mGmvg5bbDme4SEksA9ed5dkZCxNeiDkMMtGhIi2YjQbucw",
+      "expected_status": "VERIFIED",
+      "reason": "OK",
+      "expected_status_3_days_later": "EXPIRED",
+      "wav": "TV1_air_raid_single.wav",
+      "audio_seconds": 13.7
+    },
+    "TV2_evacuation_dual": {
+      "payload_hex": "0100030305b96ac1a7e000f0000700174b696572756e656b3a2047726f647a69736b204d617a2e",
+      "frame_hex": "534700ae0100030305b96ac1a7e000f0000700174b696572756e656b3a2047726f647a69736b204d617a2e020003e0c49880b15e1fbcc9efd6c8e9f4bbf228b8ec89a337c23134126e4d35b494d83755a76532a26c7055c78bead433554a9adb6805c7255f2701d05ed852aec7070005c539717618f76216f7a5e15300365ba30e46396ca726be0690f72359036e4c82119c6a7bb6cf170d0192b8cabc94978250e063e337309ca36114bbcfb9cb700ebe4a",
+      "frame_len": 178,
+      "qr_text": "SYG1:U0cArgEAAwMFuWrBp-AA8AAHABdLaWVydW5lazogR3JvZHppc2sgTWF6LgIAA-DEmICxXh-8ye_WyOn0u_IouOyJozfCMTQSbk01tJTYN1WnZTKibHBVx4vq1DNVSprbaAXHJV8nAdBe2FKuxwcABcU5cXYY92IW96XhUwA2W6MORjlspya-BpD3I1kDbkyCEZxqe7bPFw0BkrjKvJSXglDgY-M3MJyjYRS7z7nLcA6-Sg",
+      "expected_status": "VERIFIED",
+      "reason": "OK",
+      "expected_status_3_days_later": "EXPIRED",
+      "wav": "TV2_evacuation_dual.wav",
+      "audio_seconds": 19.7
+    },
+    "TV3_forged_hacker_as_1": {
+      "payload_hex": "0100010105b96ac1a7e000780001001d536368726f6e3a206d6574726f20c59a7769c499746f6b727a79736b61",
+      "frame_hex": "534700720100010105b96ac1a7e000780001001d536368726f6e3a206d6574726f20c59a7769c499746f6b727a79736b61010001d1c16286727954ac3185bfece0b0754acf9aa9c63512e9eaf3cafef0f8469643bb0120240af76d65e2a26bffbfd7d6dea2a585d33c3703587a5119814159ca0d19ba",
+      "frame_len": 118,
+      "qr_text": "SYG1:U0cAcgEAAQEFuWrBp-AAeAABAB1TY2hyb246IG1ldHJvIMWad2nEmXRva3J6eXNrYQEAAdHBYoZyeVSsMYW_7OCwdUrPmqnGNRLp6vPK_vD4RpZDuwEgJAr3bWXiomv_v9fW3qKlhdM8NwNYelEZgUFZyg0Zug",
+      "expected_status": "FORGED",
+      "reason": "BAD_SIGNATURE:1",
+      "expected_status_3_days_later": "FORGED",
+      "wav": "TV3_forged_hacker_as_1.wav",
+      "audio_seconds": 13.7
+    },
+    "TV4_evacuation_single": {
+      "payload_hex": "0100030305b96ac1a7e000f0000700174b696572756e656b3a2047726f647a69736b204d617a2e",
+      "frame_hex": "5347006c0100030305b96ac1a7e000f0000700174b696572756e656b3a2047726f647a69736b204d617a2e010003e0c49880b15e1fbcc9efd6c8e9f4bbf228b8ec89a337c23134126e4d35b494d83755a76532a26c7055c78bead433554a9adb6805c7255f2701d05ed852aec707164d",
+      "frame_len": 112,
+      "qr_text": "SYG1:U0cAbAEAAwMFuWrBp-AA8AAHABdLaWVydW5lazogR3JvZHppc2sgTWF6LgEAA-DEmICxXh-8ye_WyOn0u_IouOyJozfCMTQSbk01tJTYN1WnZTKibHBVx4vq1DNVSprbaAXHJV8nAdBe2FKuxwcWTQ",
+      "expected_status": "INCOMPLETE",
+      "reason": "DUAL_SIGNATURE_REQUIRED",
+      "expected_status_3_days_later": "INCOMPLETE",
+      "wav": "TV4_evacuation_single.wav",
+      "audio_seconds": 13.1
+    },
+    "TV5_unauthorized_area": {
+      "payload_hex": "0100060104ed6ac1a7e0007800010000",
+      "frame_hex": "534700550100060104ed6ac1a7e0007800010000010006f8fd143330aed8642dc638c096ecd28eca8cd5d88c59ef6d8eeda084acf735ac3f9c2430fd17648532e9d4c2a298f374a2a6349154e677575b3d0ed4ca7cf004dee3",
+      "frame_len": 89,
+      "qr_text": "SYG1:U0cAVQEABgEE7WrBp-AAeAABAAABAAb4_RQzMK7YZC3GOMCW7NKOyozV2IxZ722O7aCErPc1rD-cJDD9F2SFMunUwqKY83SipjSRVOZ3V1s9DtTKfPAE3uM",
+      "expected_status": "FORGED",
+      "reason": "UNAUTHORIZED_AREA:6",
+      "expected_status_3_days_later": "FORGED",
+      "wav": "TV5_unauthorized_area.wav",
+      "audio_seconds": 10.8
+    },
+    "TV6_tampered_note": {
+      "payload_hex": "0100010105b96ac1a7e000780001001d526368726f6e3a206d6574726f20c59a7769c499746f6b727a79736b61",
+      "frame_hex": "534700720100010105b96ac1a7e000780001001d526368726f6e3a206d6574726f20c59a7769c499746f6b727a79736b61010001694eca2c47e310ca09ede347e7b86b8ade21971cea2075be2baca2663aa16fb89869af8396db0e67b848492c03d79de5d9190b135e88390c32d1a1222d988d069342",
+      "frame_len": 118,
+      "qr_text": "SYG1:U0cAcgEAAQEFuWrBp-AAeAABAB1SY2hyb246IG1ldHJvIMWad2nEmXRva3J6eXNrYQEAAWlOyixH4xDKCe3jR-e4a4reIZcc6iB1viusomY6oW-4mGmvg5bbDme4SEksA9ed5dkZCxNeiDkMMtGhIi2YjQaTQg",
+      "expected_status": "FORGED",
+      "reason": "BAD_SIGNATURE:1",
+      "expected_status_3_days_later": "FORGED",
+      "wav": "TV6_tampered_note.wav",
+      "audio_seconds": 13.7
+    }
+  }
+}
