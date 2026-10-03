@@ -11,6 +11,12 @@ namespace Sygnet.Tests
     {
         public static readonly string Dir = Path.Combine(Application.dataPath, "Sygnet", "Tests", "EditMode", "Data");
 
+        /// <summary>WAV-y wektorów leżą w StreamingAssets (jedna kopia: testy w edytorze + panel debug na telefonie).</summary>
+        public static readonly string WavDir = Path.Combine(Application.streamingAssetsPath, "testvectors");
+
+        public static float[] ReadWav(Vector v, out int sampleRate) =>
+            Wav.Read(File.ReadAllBytes(Path.Combine(WavDir, v.Wav)), out sampleRate);
+
         static Dictionary<string, object> json;
 
         public static Dictionary<string, object> Json =>
