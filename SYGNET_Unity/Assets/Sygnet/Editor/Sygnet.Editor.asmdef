@@ -3,7 +3,8 @@
     "rootNamespace": "Sygnet.Editor",
     "references": [
         "Sygnet.Core",
-        "Sygnet.App"
+        "Sygnet.App",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [
         "Editor"

@@ -217,6 +217,7 @@ namespace Sygnet.App
             s.Root.gameObject.SetActive(true);
             s.Root.SetAsLastSibling();
             toast.SetAsLastSibling();
+            s.BeginEnter();
             s.OnShow();
         }
 
@@ -247,7 +248,11 @@ namespace Sygnet.App
                 Show(Home);
 
             foreach (var s in screens)
-                if (s.Visible) s.Tick();
+            {
+                if (!s.Visible) continue;
+                s.AnimateEnter(Time.unscaledDeltaTime);
+                s.Tick();
+            }
         }
 
         static void ApplySafeArea(RectTransform rt, Rect sa)
@@ -291,11 +296,10 @@ namespace Sygnet.App
             toast = Ui.Rect(canvasRoot, "Toast");
             var safe = Ui.Rect(toast, "Safe");
             RegisterSafeArea(safe);
-            var card = Ui.Card(safe, "Card", new Color(0.05f, 0.07f, 0.09f, 0.95f));
-            Ui.Bottom(card.rectTransform, 440, 170, Theme.Padding);           // nad przyciskami ekranów
-            toastText = Ui.Text(card.transform, "", Theme.TextBody, Theme.Text, TMPro.FontStyles.Normal,
-                TMPro.TextAlignmentOptions.Center);
-            Ui.Stretch(toastText.rectTransform, 32, 16, 32, 16);
+            var card = Ui.Card(safe, "Card", Theme.WithAlpha(Theme.Surface2, 0.97f), 80);
+            Ui.Bottom(card.rectTransform, 440, 160, Theme.Margin);            // nad przyciskami ekranów
+            toastText = Ui.Label(card.transform, "", TextStyle.BodyStrong, Theme.Text, TMPro.TextAlignmentOptions.Center);
+            Ui.Stretch(toastText.rectTransform, 48, 16, 48, 16);
             toast.gameObject.SetActive(false);
         }
     }

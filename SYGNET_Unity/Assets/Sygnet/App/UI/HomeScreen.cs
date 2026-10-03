@@ -6,118 +6,105 @@ using UnityEngine.UI;
 namespace Sygnet.App.UI
 {
     /// <summary>
-    /// Ekran główny (CLIENT_UNITY.md §5.2): nasłuch mikrofonu (pulsujący okrąg, widmo wokół niego,
-    /// „Odbieram… 34%” wg frame_len), skan QR i ostatni komunikat.
+    /// Ekran główny (CLIENT_UNITY.md §5.2): nasłuch mikrofonu – okrąg, którego obwód jest paskiem postępu odbioru,
+    /// widmo dookoła, „Odbieram… 34%” – oraz skan QR i ostatni komunikat. Monochrom: kolor tylko dla wyników.
     /// </summary>
     public class HomeScreen : AppScreen
     {
+        const int BarCount = 56;
+        const float HeroSize = 520;
+
         readonly TextMeshProUGUI areaLabel;
         readonly RectTransform clockChip;
         readonly TextMeshProUGUI clockText;
-        readonly Image ring1, ring2, core;
-        readonly Image coreIcon;
+        readonly Image pulse1, pulse2, track, progress, core, coreIcon;
+        readonly TextMeshProUGUI percent;
         readonly TextMeshProUGUI status, hint;
         readonly Button lastButton;
-        readonly RectTransform progressTrack, progressFill;
-
-        const int BarCount = 48;
-        readonly RectTransform[] bars;
+        readonly RectTransform[] bars = new RectTransform[BarCount];
+        readonly Image[] barImages = new Image[BarCount];
         readonly float[] barLevels = new float[BarCount];
-        float smoothLevel;
 
+        float smoothLevel, shownProgress;
         int logoTaps;
-        float lastLogoTap;
-        float nextClockRefresh;
+        float lastLogoTap, nextClockRefresh;
 
         public HomeScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Home", Theme.Bg)
         {
-            // ── górny pasek: logo (5× tap = zegar testowy) + obszar ──
-            var top = Ui.Rect(Safe, "TopBar");
-            Ui.Top(top, 48, 120, Theme.Padding);
-            var brand = Ui.Rect(top, "Brand");
-            brand.anchorMax = new Vector2(0.55f, 1);
-            var mark = Ui.Image(brand, "Mark", Color.white, Resources.Load<Sprite>("sygnet_logo"));
-            mark.preserveAspect = true;
-            mark.rectTransform.anchorMin = new Vector2(0, 0);
-            mark.rectTransform.anchorMax = new Vector2(0, 1);
-            mark.rectTransform.pivot = new Vector2(0, 0.5f);
-            mark.rectTransform.sizeDelta = new Vector2(120, 0);
-            var logo = Ui.Text(brand, "SYGNET", 64, Theme.Text, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            logo.characterSpacing = 10;
-            Ui.Stretch(logo.rectTransform, 136, 0, 0, 0);
+            // ── nagłówek: sygnet + napis (5× tap = zegar testowy), obszar ──
+            var header = Ui.Rect(Safe, "Header");
+            Ui.Top(header, 40, 104, Theme.Margin);
+            var brand = Ui.Rect(header, "Brand");
+            brand.anchorMax = new Vector2(0.62f, 1);
+            Ui.HStack(brand, 26, TextAnchor.MiddleLeft);
+            Ui.Icon(brand, Resources.Load<Sprite>("sygnet_logo"), Theme.Text, 92);
+            Ui.Label(brand, "Sygnet", TextStyle.Wordmark, Theme.Text, TextAlignmentOptions.MidlineLeft)
+                .textWrappingMode = TextWrappingModes.NoWrap;
             Ui.HitArea(brand, OnLogoTap);
 
-            var chip = Ui.Card(top, "AreaChip", Theme.Card, 48);
-            chip.rectTransform.anchorMin = new Vector2(0.55f, 0.1f);
-            chip.rectTransform.anchorMax = new Vector2(1, 0.9f);
-            chip.rectTransform.offsetMin = chip.rectTransform.offsetMax = Vector2.zero;
-            areaLabel = Ui.Text(chip.transform, "", Theme.TextSmall, Theme.Text, FontStyles.Bold, TextAlignmentOptions.Center);
-            Ui.Stretch(areaLabel.rectTransform, 24, 0, 24, 0);
+            var (areaChip, areaText) = Ui.Chip(header, Icons.Pin, "", Theme.Surface2, Theme.Text, TextStyle.BodyStrong, 88);
+            Ui.Pin(areaChip.rectTransform, new Vector2(1, 0.5f), new Vector2(0, 88));
+            areaLabel = areaText;
 
-            // ── „działa bez internetu” ──
-            var offline = Ui.Rect(Safe, "Offline");
-            Ui.Top(offline, 196, 64, Theme.Padding);
-            var plane = Ui.Image(offline, "Plane", Theme.Accent, Icons.Plane);
-            plane.rectTransform.anchorMin = new Vector2(0, 0.5f);
-            plane.rectTransform.anchorMax = new Vector2(0, 0.5f);
-            plane.rectTransform.sizeDelta = new Vector2(56, 56);
-            plane.rectTransform.anchoredPosition = new Vector2(28, 0);
-            var offText = Ui.Text(offline, "Działa bez internetu", Theme.TextSmall, Theme.Accent, FontStyles.Normal,
-                TextAlignmentOptions.MidlineLeft);
-            Ui.Stretch(offText.rectTransform, 80, 0, 0, 0);
+            // ── stan zaufania: offline + odcisk ROOT ──
+            var chips = Ui.Rect(Safe, "Chips");
+            Ui.Top(chips, 172, 72, Theme.Margin);
+            Ui.HStack(chips, 16, TextAnchor.MiddleLeft);
+            Ui.Chip(chips, Icons.Plane, "Offline", Theme.Surface, Theme.Muted, TextStyle.Caption, 72);
+            Ui.Chip(chips, Icons.Key, "ROOT " + App.Trust.RootFingerprint.Substring(0, 9) + (SygnetApp.RootIsTestKey ? " · test" : ""),
+                Theme.Surface, Theme.Muted, TextStyle.Mono, 72);
 
-            // ── zegar testowy (widoczny tylko gdy włączony) ──
-            var cc = Ui.Card(Safe, "TestClock", Theme.Expired, 42);
+            var (cc, ct) = Ui.Chip(Safe, null, "", Theme.Expired, Color.white, TextStyle.Overline, 64);
             clockChip = cc.rectTransform;
-            Ui.Top(clockChip, 290, 84, Theme.Padding);
-            clockText = Ui.Text(clockChip, "", Theme.TextSmall, Color.white, FontStyles.Bold, TextAlignmentOptions.Center);
+            Ui.Pin(clockChip, new Vector2(0, 1), new Vector2(0, 64), new Vector2(Theme.Margin, -264));
+            clockText = ct;
 
-            // ── środek: okrąg ──
-            var center = Ui.Rect(Safe, "Center");
-            Ui.Center(center, new Vector2(900, 900), new Vector2(0, 160));
-            ring1 = Ui.Image(center, "Ring1", Theme.Accent, Icons.Ring);
-            ring2 = Ui.Image(center, "Ring2", Theme.Accent, Icons.Ring);
-            foreach (var r in new[] { ring1, ring2 }) Ui.Center(r.rectTransform, new Vector2(460, 460));
-
-            // widmo: słupki promieniście wokół okręgu (pasma 800–5400 Hz z dekodera)
-            bars = new RectTransform[BarCount];
+            // ── okrąg: puls, widmo, tor i postęp odbioru, rdzeń ──
+            var hero = Ui.Rect(Safe, "Hero");
+            Ui.Center(hero, new Vector2(900, 900), new Vector2(0, 150));
+            pulse1 = Ui.Image(hero, "Pulse1", Theme.Text, Icons.Ring);
+            pulse2 = Ui.Image(hero, "Pulse2", Theme.Text, Icons.Ring);
+            foreach (var p in new[] { pulse1, pulse2 }) Ui.Center(p.rectTransform, new Vector2(HeroSize, HeroSize));
             for (int i = 0; i < BarCount; i++)
             {
-                var pivot = Ui.Rect(center, "BarPivot");
+                var pivot = Ui.Rect(hero, "BarPivot");
                 Ui.Center(pivot, Vector2.zero);
                 pivot.localEulerAngles = new Vector3(0, 0, -360f * i / BarCount);
-                var bar = Ui.Card(pivot, "Bar", Theme.WithAlpha(Theme.Accent, 0.85f), 8);
+                var bar = Ui.Card(pivot, "Bar", Theme.Text, 6);
                 var rt = bar.rectTransform;
-                rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
+                Ui.Pin(rt, new Vector2(0.5f, 0.5f), new Vector2(10, 0));
                 rt.pivot = new Vector2(0.5f, 0);
-                rt.anchoredPosition = new Vector2(0, 250);
-                rt.sizeDelta = new Vector2(16, 0);
+                rt.anchoredPosition = new Vector2(0, HeroSize / 2 + 26);
                 bars[i] = rt;
+                barImages[i] = bar;
             }
+            track = Ui.Image(hero, "Track", Theme.Line, Icons.RingThick);
+            Ui.Center(track.rectTransform, new Vector2(HeroSize, HeroSize));
+            progress = Ui.Image(hero, "Progress", Theme.Text, Icons.RingThick);
+            Ui.Center(progress.rectTransform, new Vector2(HeroSize, HeroSize));
+            progress.type = Image.Type.Filled;
+            progress.fillMethod = Image.FillMethod.Radial360;
+            progress.fillOrigin = (int)Image.Origin360.Top;
+            progress.fillClockwise = true;
+            progress.fillAmount = 0;
+            core = Ui.Image(hero, "Core", Theme.Surface, Icons.Circle);
+            Ui.Center(core.rectTransform, new Vector2(HeroSize - 92, HeroSize - 92));
+            coreIcon = Ui.Image(core.transform, "Mic", Theme.Text, Icons.Mic);
+            Ui.Center(coreIcon.rectTransform, new Vector2(150, 150));
+            percent = Ui.Label(core.transform, "", TextStyle.Display, Theme.Text, TextAlignmentOptions.Center);
+            Ui.Center(percent.rectTransform, new Vector2(400, 140));
+            Ui.HitArea(core.rectTransform, () => App.Mic.StartListening());       // ponowna prośba o mikrofon
 
-            core = Ui.Image(center, "Core", Theme.Card, Icons.Circle);
-            Ui.Center(core.rectTransform, new Vector2(460, 460));
-            coreIcon = Ui.Image(core.transform, "Icon", Theme.Text, Icons.Mic);
-            Ui.Center(coreIcon.rectTransform, new Vector2(180, 180));
-            Ui.HitArea(core.rectTransform, () => App.Mic.StartListening());     // ponowna prośba o mikrofon
+            status = Ui.Label(Safe, "", TextStyle.Headline, Theme.Text, TextAlignmentOptions.Center);
+            Ui.Center(status.rectTransform, new Vector2(980, 80), new Vector2(0, -232));
+            hint = Ui.Label(Safe, "", TextStyle.Caption, Theme.Muted, TextAlignmentOptions.Top);
+            Ui.Center(hint.rectTransform, new Vector2(900, 130), new Vector2(0, -330));
 
-            status = Ui.Text(Safe, "", Theme.TextLarge, Theme.Text, FontStyles.Bold, TextAlignmentOptions.Center);
-            Ui.Center(status.rectTransform, new Vector2(1000, 90), new Vector2(0, -190));
-
-            var track = Ui.Card(Safe, "ProgressTrack", Theme.Card, 12);
-            progressTrack = track.rectTransform;
-            Ui.Center(progressTrack, new Vector2(760, 24), new Vector2(0, -262));
-            progressFill = Ui.Card(progressTrack, "Fill", Theme.Accent, 12).rectTransform;
-            progressFill.anchorMax = new Vector2(0, 1);
-
-            hint = Ui.Text(Safe, "", Theme.TextSmall + 4, Theme.Muted, FontStyles.Normal, TextAlignmentOptions.Top);
-            Ui.Center(hint.rectTransform, new Vector2(900, 160), new Vector2(0, -330));
-
-            // ── przyciski ──
-            var scan = Ui.Button(Safe, "Skanuj kod QR", Theme.Primary, Color.white, () => App.Show(App.Scan), Icons.Qr);
-            Ui.Bottom((RectTransform)scan.transform, 230, 170, Theme.Padding);
-            lastButton = Ui.Button(Safe, "Ostatni komunikat", Theme.Card, Theme.Text, OpenLast, Icons.Inbox, Theme.TextBody - 4);
-            Ui.Bottom((RectTransform)lastButton.transform, 48, 150, Theme.Padding);
+            // ── akcje ──
+            var scan = Ui.Button(Safe, "Skanuj kod QR", ButtonKind.Primary, () => App.Show(App.Scan), Icons.Qr);
+            Ui.Bottom((RectTransform)scan.transform, 210, Theme.ButtonHeight, Theme.Margin);
+            lastButton = Ui.Button(Safe, "Ostatni komunikat", ButtonKind.Secondary, OpenLast, Icons.Inbox, 136);
+            Ui.Bottom((RectTransform)lastButton.transform, 48, 136, Theme.Margin);
         }
 
         public override void OnShow() => Refresh();
@@ -137,13 +124,15 @@ namespace Sygnet.App.UI
             var dec = mic.Decoder;
             bool listening = mic.Status == MicListener.State.Listening;
             bool receiving = listening && dec != null && dec.Progress >= 0;
+            bool denied = mic.Status == MicListener.State.PermissionDenied;
 
-            // pierścienie: spokojny „oddech”, mocniejszy przy głośnym dźwięku
+            // puls: spokojny oddech, mocniejszy przy głośnym dźwięku
             float level = listening && dec != null ? Mathf.Clamp01(dec.Rms * 12f) : 0f;
             smoothLevel = Mathf.Lerp(smoothLevel, level, 0.25f);
-            Color ringColor = mic.Status == MicListener.State.PermissionDenied ? Theme.Danger : Theme.Accent;
-            Pulse(ring1, t % 2.4f / 2.4f, ringColor, listening ? 0.35f + 0.4f * smoothLevel : 0.15f);
-            Pulse(ring2, (t + 1.2f) % 2.4f / 2.4f, ringColor, listening ? 0.35f + 0.4f * smoothLevel : 0.15f);
+            Color pulseColor = denied ? Theme.Danger : Theme.Text;
+            float strength = listening ? 0.10f + 0.25f * smoothLevel : 0.05f;
+            Pulse(pulse1, t % 2.6f / 2.6f, pulseColor, strength);
+            Pulse(pulse2, (t + 1.3f) % 2.6f / 2.6f, pulseColor, strength);
 
             // widmo
             for (int i = 0; i < BarCount; i++)
@@ -151,15 +140,21 @@ namespace Sygnet.App.UI
                 float target = 0;
                 if (listening && dec != null && dec.Rms > 0.002f)
                     target = Mathf.Clamp01(Mathf.Sqrt((float)dec.Spectrum[i % dec.Spectrum.Length]) * 1.6f) * (0.3f + 0.7f * level);
-                barLevels[i] = Mathf.Lerp(barLevels[i], target, target > barLevels[i] ? 0.6f : 0.15f);
-                bars[i].sizeDelta = new Vector2(16, 8 + 130 * barLevels[i]);
+                barLevels[i] = Mathf.Lerp(barLevels[i], target, target > barLevels[i] ? 0.6f : 0.12f);
+                bars[i].sizeDelta = new Vector2(10, 6 + 120 * barLevels[i]);
+                barImages[i].color = Theme.WithAlpha(Theme.Text, 0.25f + 0.75f * barLevels[i]);
             }
 
-            core.color = receiving ? Theme.WithAlpha(Theme.Accent, 0.35f) : Theme.Card;
-            progressTrack.gameObject.SetActive(receiving);
-            if (receiving) progressFill.anchorMax = new Vector2(Mathf.Clamp01((float)dec.Progress), 1);
-            UpdateStatus(mic, receiving);
+            // postęp odbioru na obwodzie okręgu
+            float target01 = receiving ? Mathf.Clamp01((float)dec.Progress) : 0f;
+            shownProgress = receiving ? Mathf.Lerp(shownProgress, target01, 0.3f) : Mathf.MoveTowards(shownProgress, 0, Time.unscaledDeltaTime * 2);
+            progress.fillAmount = shownProgress;
+            coreIcon.gameObject.SetActive(!receiving);
+            percent.gameObject.SetActive(receiving);
+            if (receiving) percent.text = Mathf.RoundToInt(target01 * 100) + "%";
+            coreIcon.color = denied ? Theme.Danger : Theme.Text;
 
+            UpdateStatus(mic, receiving);
             if (App.TestClock && t > nextClockRefresh) UpdateClock();
         }
 
@@ -168,12 +163,11 @@ namespace Sygnet.App.UI
             switch (mic.Status)
             {
                 case MicListener.State.Listening when receiving:
-                    int pct = Mathf.RoundToInt((float)mic.Decoder.Progress * 100);
-                    status.text = "Odbieram… " + pct + "%";
-                    hint.text = "Komunikat dźwiękowy (" + mic.Decoder.ReceivingBytes + " B).\nNie zasłaniaj mikrofonu.";
+                    status.text = "Odbieram komunikat…";
+                    hint.text = mic.Decoder.ReceivingBytes + " B · nie zasłaniaj mikrofonu";
                     break;
                 case MicListener.State.Listening:
-                    status.text = "Nasłuchuję komunikatów…";
+                    status.text = "Nasłuchuję komunikatów";
                     hint.text = "Radio, megafon albo telefon sąsiada.\nMożesz też zeskanować kod QR.";
                     break;
                 case MicListener.State.Paused:
@@ -190,14 +184,14 @@ namespace Sygnet.App.UI
                     break;
                 default:
                     status.text = "Gotowy do odbioru";
-                    hint.text = "Zeskanuj kod QR komunikatu\nz plakatu lub ekranu";
+                    hint.text = "Zeskanuj kod QR komunikatu\nz plakatu lub ekranu.";
                     break;
             }
         }
 
         static void Pulse(Image ring, float phase, Color color, float strength)
         {
-            float s = 1f + 0.55f * phase;
+            float s = 1f + 0.5f * phase;
             ring.rectTransform.localScale = new Vector3(s, s, 1);
             ring.color = Theme.WithAlpha(color, strength * (1f - phase));
         }
@@ -205,7 +199,7 @@ namespace Sygnet.App.UI
         void UpdateClock()
         {
             nextClockRefresh = Time.unscaledTime + 1f;
-            clockText.text = "ZEGAR TESTOWY · " + Ui.Time(App.Now);
+            clockText.text = "Zegar testowy · " + Ui.Time(App.Now);
         }
 
         void OnLogoTap()

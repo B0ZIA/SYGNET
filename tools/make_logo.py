@@ -29,7 +29,7 @@ SS = 4
 BG = (10, 12, 15)           # #0A0C0F
 WHITE = (236, 240, 244)     # #ECF0F4
 BLACK = (10, 12, 15)
-FONT = "C:/Windows/Fonts/bahnschrift.ttf"   # geometryczny krój techniczny (Windows 10/11)
+FONT = os.path.join(UNITY, "Sygnet", "Fonts", "Inter-Bold.ttf")   # ten sam krój co w aplikacji (OFL)
 
 # geometria w jednostkach 0..100
 BAND_C, BAND_R, BAND_W = (50, 68), 24, 8.5  # obrączka
@@ -82,13 +82,12 @@ def colorize(mask, color, background=None):
 
 
 def lockup(height, fg, bg=None):
-    """Znak + rozstrzelony napis SYGNET w poziomie."""
+    """Znak + rozstrzelony napis SYGNET (Inter Bold) w poziomie."""
     m = mark_mask()
     crop = m.crop(m.getbbox())
     mh = int(height * 0.86)
     crop = crop.resize((round(crop.size[0] * mh / crop.size[1]), mh), Image.LANCZOS)
-    font = ImageFont.truetype(FONT, int(height * 0.40))
-    font.set_variation_by_name("SemiBold")
+    font = ImageFont.truetype(FONT, int(height * 0.38))
     text, spacing = "SYGNET", height * 0.12
     probe = ImageDraw.Draw(Image.new("L", (1, 1)))
     widths = [probe.textlength(ch, font=font) for ch in text]

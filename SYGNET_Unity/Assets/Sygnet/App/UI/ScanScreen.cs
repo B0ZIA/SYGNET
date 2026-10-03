@@ -8,8 +8,11 @@ namespace Sygnet.App.UI
     public class ScanScreen : AppScreen
     {
         const string DefaultHint = "Nakieruj aparat na kod QR komunikatu SYGNET";
+        const float FinderSize = 740;
+        static readonly Vector2 FinderOffset = new Vector2(0, 80);
 
         readonly RawImage preview;
+        readonly RectTransform finder, scanLine;
         readonly TextMeshProUGUI hint;
         readonly Image hintCard;
         readonly Button retry;
@@ -18,48 +21,59 @@ namespace Sygnet.App.UI
         public ScanScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Scan", Color.black)
         {
             var pv = Ui.Rect(Root, "Preview");
-            pv.SetSiblingIndex(1);                                         // nad tłem, pod obszarem bezpiecznym
+            pv.SetSiblingIndex(1);                                         // nad tłem, pod treścią
             preview = pv.gameObject.AddComponent<RawImage>();
             preview.raycastTarget = false;
-            preview.color = Color.white;
 
-            // celownik: 4 narożniki
-            var finder = Ui.Rect(Safe, "Finder");
-            Ui.Center(finder, new Vector2(760, 760), new Vector2(0, 60));
-            const float len = 130, th = 14;
-            foreach (var (ax, ay) in new[] { (0f, 0f), (1f, 0f), (0f, 1f), (1f, 1f) })
+            // przyciemnienie poza celownikiem: 4 prostokąty wokół wycięcia
+            var shade = Theme.WithAlpha(Theme.Bg, 0.62f);
+            finder = Ui.Rect(Safe, "Finder");
+            Ui.Center(finder, new Vector2(FinderSize, FinderSize), FinderOffset);
+            foreach (var (min, max) in new[]
+                     {
+                         (new Vector2(-10, 1), new Vector2(11, 10)), (new Vector2(-10, -10), new Vector2(11, 0)),
+                         (new Vector2(-10, 0), new Vector2(0, 1)), (new Vector2(1, 0), new Vector2(11, 1)),
+                     })
             {
-                var h = Ui.Image(finder, "H", Color.white);
-                var v = Ui.Image(finder, "V", Color.white);
-                foreach (var img in new[] { h, v })
-                {
-                    var rt = img.rectTransform;
-                    rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(ax, ay);
-                    rt.anchoredPosition = Vector2.zero;
-                }
-                h.rectTransform.sizeDelta = new Vector2(len, th);
-                v.rectTransform.sizeDelta = new Vector2(th, len);
+                var r = Ui.Image(finder, "Shade", shade).rectTransform;
+                r.anchorMin = min;
+                r.anchorMax = max;
+                r.offsetMin = r.offsetMax = Vector2.zero;
             }
 
+            // narożniki
+            const float len = 120, th = 12;
+            foreach (var (ax, ay) in new[] { (0f, 0f), (1f, 0f), (0f, 1f), (1f, 1f) })
+            {
+                foreach (var size in new[] { new Vector2(len, th), new Vector2(th, len) })
+                {
+                    var c = Ui.Card(finder, "Corner", Theme.Text, th / 2).rectTransform;
+                    Ui.Pin(c, new Vector2(ax, ay), size);
+                }
+            }
+
+            // linia skanowania
+            scanLine = Ui.Card(finder, "ScanLine", Theme.WithAlpha(Theme.Text, 0.7f), 3).rectTransform;
+            scanLine.anchorMin = new Vector2(0, 0.5f);
+            scanLine.anchorMax = new Vector2(1, 0.5f);
+            scanLine.sizeDelta = new Vector2(-80, 6);
+
             // górny pasek
-            var back = Ui.Button(Safe, "", new Color(0, 0, 0, 0.55f), Color.white, () => App.Show(App.Home), Icons.Back,
-                Theme.TextBody, radius: 66);
+            var back = Ui.Button(Safe, "", ButtonKind.Secondary, () => App.Show(App.Home), Icons.Back, 128);
             var brt = (RectTransform)back.transform;
-            brt.anchorMin = brt.anchorMax = brt.pivot = new Vector2(0, 1);
-            brt.sizeDelta = new Vector2(132, 132);
-            brt.anchoredPosition = new Vector2(Theme.Padding, -48);
-            var title = Ui.Text(Safe, "Skanuj kod QR", Theme.TextLarge, Color.white, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            Ui.Top(title.rectTransform, 48, 132, 0);
-            title.rectTransform.offsetMin = new Vector2(Theme.Padding + 132 + 40, title.rectTransform.offsetMin.y);
+            Ui.Pin(brt, new Vector2(0, 1), new Vector2(128, 128), new Vector2(Theme.Margin, -40));
+            var title = Ui.Label(Safe, "Skanuj kod QR", TextStyle.Title, Theme.Text, TextAlignmentOptions.MidlineLeft);
+            Ui.Top(title.rectTransform, 40, 128, 0);
+            title.rectTransform.offsetMin = new Vector2(Theme.Margin + 128 + 36, title.rectTransform.offsetMin.y);
 
-            // podpowiedź na dole
-            hintCard = Ui.Card(Safe, "Hint", new Color(0, 0, 0, 0.7f));
-            Ui.Bottom(hintCard.rectTransform, 220, 230, Theme.Padding);
-            hint = Ui.Text(hintCard.transform, DefaultHint, Theme.TextBody, Color.white, FontStyles.Normal, TextAlignmentOptions.Center);
-            Ui.Stretch(hint.rectTransform, 40, 20, 40, 20);
+            // podpowiedź
+            hintCard = Ui.Card(Safe, "Hint", Theme.WithAlpha(Theme.Surface, 0.92f));
+            Ui.Bottom(hintCard.rectTransform, 220, 200, Theme.Margin);
+            hint = Ui.Label(hintCard.transform, DefaultHint, TextStyle.Body, Theme.Text, TextAlignmentOptions.Center);
+            Ui.Stretch(hint.rectTransform, 44, 20, 44, 20);
 
-            retry = Ui.Button(Safe, "Spróbuj ponownie", Theme.Primary, Color.white, () => App.Scanner.StartCamera());
-            Ui.Bottom((RectTransform)retry.transform, 48, 150, Theme.Padding);
+            retry = Ui.Button(Safe, "Spróbuj ponownie", ButtonKind.Primary, () => App.Scanner.StartCamera());
+            Ui.Bottom((RectTransform)retry.transform, 48, Theme.ButtonHeight, Theme.Margin);
         }
 
         public override void OnShow()
@@ -101,15 +115,20 @@ namespace Sygnet.App.UI
         void SetHint(string text, bool error)
         {
             hint.text = text;
-            hintCard.color = error ? Theme.WithAlpha(Theme.Danger, 0.92f) : new Color(0, 0, 0, 0.7f);
+            hintCard.color = error ? Theme.WithAlpha(Theme.Danger, 0.95f) : Theme.WithAlpha(Theme.Surface, 0.92f);
         }
 
         public override void Tick()
         {
+            // linia skanowania: płynnie góra–dół w obrębie celownika
+            float phase = Mathf.PingPong(Time.unscaledTime * 0.55f, 1f);
+            float eased = phase * phase * (3 - 2 * phase);
+            scanLine.anchoredPosition = new Vector2(0, (eased - 0.5f) * (FinderSize - 80));
+
             var s = App.Scanner;
             retry.gameObject.SetActive(s.Status == QrScanner.State.PermissionDenied);
             if (s.Status == QrScanner.State.PermissionDenied)
-                SetHint("Brak dostępu do aparatu. Zezwól na użycie aparatu, aby skanować kody.", true);
+                SetHint("Brak dostępu do aparatu. Zezwól na aparat, żeby skanować kody.", true);
             else if (s.Status == QrScanner.State.NoCamera)
                 SetHint("Nie znaleziono aparatu.", true);
             else if (errorUntil > 0 && Time.unscaledTime > errorUntil)
