@@ -48,7 +48,7 @@
                     <div class="seg">
                         <template x-for="m in boot.validity" :key="m">
                             <button type="button" :aria-pressed="form.valid_minutes === m" @click="form.valid_minutes = m"
-                                    x-text="sygnet.validity(m)"></button>
+                                    x-text="m < 60 ? m + ' min' : m <= 1440 ? (m / 60) + ' h' : (m / 1440) + ' dni'"></button>
                         </template>
                     </div>
                 </div>

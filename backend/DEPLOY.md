@@ -175,6 +175,7 @@ Klucze (`storage/app/keys`) i baza nie są w gicie – `git pull` ich nie rusza.
 | Błąd 500 | `tail -50 storage/logs/laravel.log` |
 | Kontrolna weryfikacja: `FORGED UNKNOWN_ISSUER:1`, czerwony pasek „Klucze konsoli i trust store nie pasują” | `php artisan sygnet:check` i zrób, co każe: **„Trust store jest od innego ROOT”** → `php artisan sygnet:export` (odtworzy eksport z kluczy na serwerze, bez nowych kluczy); **„Klucze konsoli … to nie te, które zna aplikacja”** → skopiuj `storage/app/keys` i `storage/app/export` z laptopa (krok 7). Potem `php artisan optimize` |
 | `Vite manifest not found` | krok 4 (brak `public/build`) |
+| Puste przyciski albo brak nowych funkcji po `git pull` (np. pusta „Ważność”) | front nie został przebudowany: `npm ci && npm run build && php artisan optimize` (albo krok 4B z laptopa) |
 | `Table 'hackathon_api.broadcasts' doesn't exist` | krok 6 |
 | `Permission denied` w `storage/` | `chmod -R u+rwX storage bootstrap/cache` |
 | W nagłówku „ROOT brak”, przy podpisie „Konsola nie ma klucza tego nadawcy” | klucze nie skopiowane (krok 7) albo PHP strony działa jako inny użytkownik i nie czyta plików `600` – wtedy `chmod 755 storage/app/keys && chmod 644 storage/app/keys/*.seed`, ale **tylko jeśli** sprawdzenie z kroku 1 (curl) dało 404; **nie** uruchamiaj `sygnet:init` |
