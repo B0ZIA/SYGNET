@@ -22,6 +22,11 @@ namespace Sygnet.App
         /// <summary>now_for_tests z testvectors.json – „zegar testowy” pozwala pokazać wektory TV1–TV6 jako aktualne.</summary>
         public const long TestVectorsNow = 1791076920;
 
+        /// <summary>Odcisk ROOT z wektorów testowych (seed 0x02×32) – wtedy aplikacja oznacza klucz jako TESTOWY.</summary>
+        public const string TestRootFingerprint = "6A38-03D5-F059-902A";
+
+        public static bool RootIsTestKey => RootKey.Fingerprint == TestRootFingerprint;
+
         public TrustStore Trust { get; private set; }
         public Storage Store { get; private set; }
         public RelayPlayer Relay { get; private set; }
@@ -76,7 +81,7 @@ namespace Sygnet.App
 
         void LoadTrustStore()
         {
-            var rootPub = RootKey.PublicKey;
+            var rootPub = (byte[])RootKey.Public.Clone();                 // kopia: pole statyczne jest modyfikowalne
             if (Ed25519.Fingerprint(rootPub) != RootKey.Fingerprint)
                 Debug.LogError("[SYGNET] Odcisk wbudowanego klucza ROOT nie zgadza się ze stałą Fingerprint!");
             var json = Resources.Load<TextAsset>("sygnet_trust_store");
@@ -91,7 +96,7 @@ namespace Sygnet.App
             }
             foreach (var why in Trust.Rejected) Debug.LogWarning("[SYGNET] Odrzucony certyfikat: " + why);
             Debug.Log("[SYGNET] Zaufani wydawcy: " + Trust.Issuers.Count + ", ROOT " + Trust.RootFingerprint +
-                      (RootKey.IsTestKey ? " (TESTOWY)" : ""));
+                      (RootIsTestKey ? " (TESTOWY)" : ""));
         }
 
         T Add<T>(T s) where T : AppScreen
@@ -212,6 +217,7 @@ namespace Sygnet.App
             s.Root.gameObject.SetActive(true);
             s.Root.SetAsLastSibling();
             toast.SetAsLastSibling();
+            s.BeginEnter();
             s.OnShow();
         }
 
@@ -242,7 +248,11 @@ namespace Sygnet.App
                 Show(Home);
 
             foreach (var s in screens)
-                if (s.Visible) s.Tick();
+            {
+                if (!s.Visible) continue;
+                s.AnimateEnter(Time.unscaledDeltaTime);
+                s.Tick();
+            }
         }
 
         static void ApplySafeArea(RectTransform rt, Rect sa)
@@ -286,11 +296,10 @@ namespace Sygnet.App
             toast = Ui.Rect(canvasRoot, "Toast");
             var safe = Ui.Rect(toast, "Safe");
             RegisterSafeArea(safe);
-            var card = Ui.Card(safe, "Card", new Color(0.05f, 0.07f, 0.09f, 0.95f));
-            Ui.Bottom(card.rectTransform, 440, 170, Theme.Padding);           // nad przyciskami ekranów
-            toastText = Ui.Text(card.transform, "", Theme.TextBody, Theme.Text, TMPro.FontStyles.Normal,
-                TMPro.TextAlignmentOptions.Center);
-            Ui.Stretch(toastText.rectTransform, 32, 16, 32, 16);
+            var card = Ui.Card(safe, "Card", Theme.WithAlpha(Theme.Surface2, 0.97f), 80);
+            Ui.Bottom(card.rectTransform, 440, 160, Theme.Margin);            // nad przyciskami ekranów
+            toastText = Ui.Label(card.transform, "", TextStyle.BodyStrong, Theme.Text, TMPro.TextAlignmentOptions.Center);
+            Ui.Stretch(toastText.rectTransform, 48, 16, 48, 16);
             toast.gameObject.SetActive(false);
         }
     }

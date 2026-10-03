@@ -55,6 +55,56 @@ namespace Sygnet.App.UI
             Max(Mathf.Abs(C(x, y, 50, 50, 24)) - 3.5f, 50 - y),
             Seg(x, y, 50, 74, 50, 88, 7), Seg(x, y, 36, 88, 64, 88, 7))));
 
+        /// <summary>Gruby pierścień do paska postępu (Image.Type.Filled, Radial360).</summary>
+        public static Sprite RingThick => Get("ringThick", () => Make(512, (x, y) => Mathf.Abs(C(x, y, 50, 50, 46)) - 3.2f));
+
+        public static Sprite Pin => Get("pin", () => Make(128, (x, y) => Max(
+            Min(C(x, y, 50, 40, 26), Poly(x, y, new Vector2(29, 52), new Vector2(71, 52), new Vector2(50, 90))),
+            -C(x, y, 50, 40, 10))));
+
+        public static Sprite Key => Get("key", () => Make(128, (x, y) => Min(
+            Mathf.Abs(C(x, y, 30, 50, 15)) - 4.5f,
+            Seg(x, y, 45, 50, 90, 50, 9), Seg(x, y, 76, 50, 76, 66, 9), Seg(x, y, 88, 50, 88, 62, 9))));
+
+        public static Sprite Drop => Get("drop", () => Make(128, (x, y) =>
+            Min(C(x, y, 50, 62, 26), Poly(x, y, new Vector2(25.5f, 54), new Vector2(74.5f, 54), new Vector2(50, 8)))));
+
+        public static Sprite Bolt => Get("bolt", () => Make(128, (x, y) => Poly(x, y,
+            new Vector2(58, 6), new Vector2(22, 56), new Vector2(47, 56), new Vector2(40, 94), new Vector2(78, 40),
+            new Vector2(53, 40))));
+
+        public static Sprite Flask => Get("flask", () => Make(128, (x, y) => Min(
+            Seg(x, y, 36, 10, 64, 10, 8), Seg(x, y, 42, 10, 42, 40, 8), Seg(x, y, 58, 10, 58, 40, 8),
+            Seg(x, y, 42, 40, 18, 84, 8), Seg(x, y, 58, 40, 82, 84, 8), Seg(x, y, 18, 84, 82, 84, 8),
+            Poly(x, y, new Vector2(30, 64), new Vector2(70, 64), new Vector2(82, 86), new Vector2(18, 86)))));
+
+        public static Sprite Info => Get("info", () => Make(128, (x, y) => Min(
+            Mathf.Abs(C(x, y, 50, 50, 40)) - 4.5f, C(x, y, 50, 29, 6), Seg(x, y, 50, 45, 50, 74, 10))));
+
+        public static Sprite Exit => Get("exit", () => Make(128, (x, y) => Min(
+            Seg(x, y, 56, 12, 16, 12, 8), Seg(x, y, 16, 12, 16, 88, 8), Seg(x, y, 16, 88, 56, 88, 8),
+            Seg(x, y, 38, 50, 86, 50, 9), Seg(x, y, 70, 33, 87, 50, 9), Seg(x, y, 87, 50, 70, 67, 9))));
+
+        public static Sprite CheckCircle => Get("checkCircle", () => Make(128, (x, y) => Min(
+            Mathf.Abs(C(x, y, 50, 50, 40)) - 4.5f, Seg(x, y, 32, 52, 45, 65, 9), Seg(x, y, 45, 65, 69, 37, 9))));
+
+        /// <summary>Ikona typu komunikatu (PROTOCOL.md §4).</summary>
+        public static Sprite ForAlert(int type)
+        {
+            switch (type)
+            {
+                case Sygnet.Core.AlertTypes.AirRaid: return Plane;
+                case Sygnet.Core.AlertTypes.AllClear: return CheckCircle;
+                case Sygnet.Core.AlertTypes.Evacuation: return Exit;
+                case Sygnet.Core.AlertTypes.WaterContamination: return Drop;
+                case Sygnet.Core.AlertTypes.PowerOutage: return Bolt;
+                case Sygnet.Core.AlertTypes.Chemical: return Flask;
+                case Sygnet.Core.AlertTypes.DisinfoWarning: return Warning;
+                case Sygnet.Core.AlertTypes.KeyRevoke: return Key;
+                default: return Info;
+            }
+        }
+
         // ───────────── renderer ─────────────
 
         static Sprite Get(string key, Func<Sprite> make)

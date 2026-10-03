@@ -95,3 +95,7 @@ InitTestScene*.unity*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Kopie scen po crashu edytora
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta

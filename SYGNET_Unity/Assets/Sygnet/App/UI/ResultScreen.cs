@@ -7,33 +7,30 @@ using UnityEngine.UI;
 namespace Sygnet.App.UI
 {
     /// <summary>
-    /// Pełnoekranowy wynik weryfikacji w kolorze statusu (CLIENT_UNITY.md §5.3): status, nadawca z certyfikatu
-    /// i odcisk, typ, obszar, czasy, dopisek, „Co robić”, podpisujący. Dla FAŁSZYWKI powód po ludzku
+    /// Pełnoekranowy wynik weryfikacji w kolorze statusu (CLIENT_UNITY.md §5.3): status, typ z ikoną, dopisek,
+    /// „Co robić”, nadawca z certyfikatu i odcisk, podpisujący, czasy. Dla FAŁSZYWKI powód po ludzku
     /// i BEZ treści atakującego.
     /// </summary>
     public class ResultScreen : AppScreen
     {
-        static readonly Color OnColor = Color.white;
-        static readonly Color OnColorMuted = new Color(1, 1, 1, 0.78f);
+        static readonly Color On = Color.white;
+        static readonly Color OnMuted = new Color(1, 1, 1, 0.72f);
         static readonly Color Overlay = new Color(0, 0, 0, 0.22f);
-
-        const float ButtonHeight = 160, ButtonGap = 40;
 
         readonly RectTransform body;
         readonly RectTransform content;
         readonly Button relayButton;
-        readonly Button okButton;
         VerificationResult current;
 
         public ResultScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Result", Theme.Verified)
         {
             body = Ui.Rect(Safe, "Body");
-            content = Ui.Scroll(body, "Scroll", 36, new RectOffset(56, 56, 72, 56));
+            content = Ui.Scroll(body, "Scroll", 28, new RectOffset(56, 56, 40, 48));
 
-            okButton = Ui.Button(Safe, "OK", Color.white, Theme.Bg, () => App.Show(App.Home));
-            Ui.Bottom((RectTransform)okButton.transform, ButtonGap, ButtonHeight, Theme.Padding);
-            relayButton = Ui.Button(Safe, "Przekaż dalej", new Color(0, 0, 0, 0.35f), Color.white, Relay, Icons.Speaker);
-            Ui.Bottom((RectTransform)relayButton.transform, 2 * ButtonGap + ButtonHeight, ButtonHeight, Theme.Padding);
+            var ok = Ui.Button(Safe, "OK", ButtonKind.Primary, () => App.Show(App.Home));
+            Ui.Bottom((RectTransform)ok.transform, 40, Theme.ButtonHeight, Theme.Margin);
+            relayButton = Ui.Button(Safe, "Przekaż dalej", ButtonKind.OnColor, Relay, Icons.Speaker);
+            Ui.Bottom((RectTransform)relayButton.transform, 40 + Theme.ButtonHeight + 24, Theme.ButtonHeight, Theme.Margin);
         }
 
         public void Show(VerificationResult r, long receivedAt, bool duplicate)
@@ -42,9 +39,9 @@ namespace Sygnet.App.UI
             Background.color = Theme.ForStatus(r.Status);
             for (int i = content.childCount - 1; i >= 0; i--) Object.Destroy(content.GetChild(i).gameObject);
             Build(r, receivedAt, duplicate);
-            relayButton.gameObject.SetActive(r.IsAuthentic);               // przekazujemy tylko prawdziwe
+            relayButton.gameObject.SetActive(r.IsAuthentic);                // przekazujemy tylko prawdziwe
             int buttons = r.IsAuthentic ? 2 : 1;
-            Ui.Stretch(body, 0, 0, 0, buttons * (ButtonHeight + ButtonGap) + ButtonGap);
+            Ui.Stretch(body, 0, 0, 0, 40 + buttons * Theme.ButtonHeight + (buttons - 1) * 24 + 24);
             content.anchoredPosition = Vector2.zero;
         }
 
@@ -79,71 +76,73 @@ namespace Sygnet.App.UI
             var type = AlertTypes.Get(p.Type);
             bool rejected = r.Status == VerifyStatus.Forged || r.Status == VerifyStatus.Incomplete;
 
-            // ikona + status
-            var iconRow = Ui.Rect(content, "IconRow");
-            Ui.Layout(iconRow, 170, 170);
-            var circle = Ui.Image(iconRow, "Circle", new Color(1, 1, 1, 0.18f), Icons.Circle);
-            Ui.Center(circle.rectTransform, new Vector2(170, 170));
-            var icon = Ui.Image(circle.transform, "Icon", OnColor, StatusIcon(r.Status));
-            Ui.Center(icon.rectTransform, new Vector2(100, 100));
+            // sygnatura marki + godzina odbioru
+            var top = Row(content, 20);
+            Ui.Icon(top, Resources.Load<Sprite>("sygnet_logo"), OnMuted, 44);
+            Ui.Label(top, "Sygnet", TextStyle.Overline, OnMuted, TextAlignmentOptions.MidlineLeft);
+            Ui.Layout(Ui.Rect(top, "Spacer"), -1, -1, -1, 1);
+            Ui.Label(top, Ui.Clock(receivedAt) + (App.TestClock ? " test" : ""), TextStyle.Mono, OnMuted, TextAlignmentOptions.MidlineRight);
 
-            var title = Ui.Text(content, Messages.Title(r.Status), Theme.TextTitle, OnColor, FontStyles.Bold, TextAlignmentOptions.Center);
+            // status
+            var head = Ui.Rect(content, "Head");
+            Ui.VStack(head, 14, new RectOffset(0, 0, 24, 8), TextAnchor.UpperCenter).childForceExpandWidth = false;
+            var iconBg = Ui.Image(head, "Circle", new Color(1, 1, 1, 0.16f), Icons.Circle);
+            Ui.Layout(iconBg, 150, 150, 150);
+            var icon = Ui.Image(iconBg.transform, "Icon", On, StatusIcon(r.Status));
+            Ui.Center(icon.rectTransform, new Vector2(84, 84));
+            var title = Ui.Label(head, Messages.Title(r.Status), TextStyle.Display, On, TextAlignmentOptions.Center);
             title.enableAutoSizing = true;
-            title.fontSizeMin = 64;
-            title.fontSizeMax = Theme.TextTitle;
+            title.fontSizeMin = 60;
+            title.fontSizeMax = 96;
             title.textWrappingMode = TextWrappingModes.NoWrap;
-            Ui.Layout(title, 130, 130);
-            Ui.Text(content, StatusLine(r, p), Theme.TextBody, OnColor, FontStyles.Normal, TextAlignmentOptions.Center);
+            Ui.Layout(title, 116, 116, 968);
+            var line = Ui.Label(head, StatusLine(r, p), TextStyle.Body, On, TextAlignmentOptions.Center);
+            Ui.Layout(line, -1, -1, 968);
 
             if (duplicate)
-                Chip("Ten komunikat jest już w skrzynce");
+            {
+                var c = Card(new Color(1, 1, 1, 0.16f), 22);
+                Ui.Label(c, "Ten komunikat jest już w skrzynce", TextStyle.BodyStrong, On, TextAlignmentOptions.Center);
+            }
 
-            // powód odrzucenia
+            // powód odrzucenia – najważniejsze przy fałszywce
             var reason = Messages.Reason(r, App.Trust);
             if (rejected && reason != null)
             {
-                var card = Card(new Color(0, 0, 0, 0.3f));
-                Ui.Text(card, reason, Theme.TextLarge - 4, OnColor, FontStyles.Bold);
+                var c = Card(new Color(0, 0, 0, 0.3f));
+                Ui.Label(c, reason, TextStyle.Headline, On);
             }
 
             // treść: typ + dopisek (dopisek tylko z poprawnym podpisem – nie powielamy treści atakującego)
-            var message = Card(Overlay);
-            if (rejected)
-            {
-                Small(message, "PODAJE SIĘ ZA");
-                Ui.Text(message, type.Name, Theme.TextLarge, OnColor, FontStyles.Bold);
-                Line(message, "Nadawca", IssuerLabel(r));
-            }
-            else
-            {
-                Small(message, type.Code == "KEY_REVOKE" ? "KOMUNIKAT SYSTEMOWY" : "KOMUNIKAT");
-                Ui.Text(message, type.Name, Theme.TextLarge + 8, OnColor, FontStyles.Bold);
-                if (p.Note.Length > 0 && p.Type != AlertTypes.KeyRevoke)
-                    Ui.PlainText(message, "„" + p.NoteText + "”", Theme.TextLarge - 4, OnColor, FontStyles.Italic);
-            }
+            var msg = Card(Overlay);
+            Ui.Label(msg, rejected ? "Podaje się za" : type.Code == "KEY_REVOKE" ? "Komunikat systemowy" : "Komunikat",
+                TextStyle.Overline, OnMuted);
+            var typeRow = Row(msg, 22);
+            Ui.Icon(typeRow, Icons.ForAlert(p.Type), On, 64);
+            Ui.Label(typeRow, type.Name, TextStyle.Title, On, TextAlignmentOptions.MidlineLeft);
+            if (!rejected && p.Note.Length > 0 && p.Type != AlertTypes.KeyRevoke)
+                Ui.PlainLabel(msg, "„" + p.NoteText + "”", TextStyle.Headline, On);
+            if (rejected) Detail(msg, "Nadawca", IssuerLabel(r));
 
-            // co robić – najważniejsze, więc zaraz pod treścią
+            // co robić
             var todo = Card(Color.white);
-            Ui.Text(todo, "CO ROBIĆ", Theme.TextSmall, Theme.Muted, FontStyles.Bold);
-            Ui.Text(todo, Instruction(r, type), Theme.TextLarge - 4, Theme.Bg, FontStyles.Bold);
+            Ui.Label(todo, "Co robić", TextStyle.Overline, Theme.Dim);
+            Ui.Label(todo, Instruction(r, type), TextStyle.Headline, Theme.Bg);
 
             // szczegóły z certyfikatu
             if (!rejected)
             {
-                var details = Card(Overlay);
-                Line(details, "Nadawca", IssuerLabel(r));
+                var d = Card(Overlay);
+                Detail(d, "Nadawca", IssuerLabel(r));
                 var fp = App.Trust.FingerprintOf(p.IssuerId);
-                if (fp != null) Line(details, "Klucz", fp);
-                if (r.SignerIds.Length > 1) Line(details, "Podpisali", string.Join(" + ", Names(r)));
-                Line(details, "Obszar", Areas.Name(p.AreaCode));
-                Line(details, "Wydano", Ui.Time(p.Timestamp));
-                Line(details, r.Status == VerifyStatus.Expired ? "Wygasł" : "Ważne do", Ui.Time(p.ValidUntil));
+                if (fp != null) Detail(d, "Klucz", fp, mono: true);
+                if (r.SignerIds.Length > 1) Detail(d, "Podpisali", string.Join(" + ", Names(r)));
+                Detail(d, "Obszar", Areas.Name(p.AreaCode));
+                Detail(d, "Wydano", Ui.Time(p.Timestamp), mono: true);
+                Detail(d, r.Status == VerifyStatus.Expired ? "Wygasł" : "Ważne do", Ui.Time(p.ValidUntil), mono: true);
                 int revoked = Verifier.RevokedIssuerId(p);
-                if (revoked >= 0) Line(details, "Unieważniony", App.Trust.NameOf(revoked) ?? ("wydawca " + revoked));
+                if (revoked >= 0) Detail(d, "Unieważniony", App.Trust.NameOf(revoked) ?? ("wydawca " + revoked));
             }
-
-            Ui.Text(content, "Odebrano " + Ui.Time(receivedAt) + (App.TestClock ? " (zegar testowy)" : ""),
-                Theme.TextSmall, OnColorMuted, FontStyles.Normal, TextAlignmentOptions.Center);
         }
 
         static Sprite StatusIcon(VerifyStatus s)
@@ -161,11 +160,9 @@ namespace Sygnet.App.UI
         {
             switch (r.Status)
             {
-                case VerifyStatus.Verified: return "Podpis sprawdzony. Komunikat dotyczy Twojego obszaru.";
-                case VerifyStatus.VerifiedOtherArea:
-                    return "Prawdziwy komunikat, ale dla innego obszaru (" + Areas.Name(p.AreaCode) + ").";
-                case VerifyStatus.Expired:
-                    return "Prawdziwy, ale nieaktualny – wygasł " + Ui.Time(p.ValidUntil) + ". Możliwe odtworzone nagranie.";
+                case VerifyStatus.Verified: return "Podpis sprawdzony. Dotyczy Twojego obszaru.";
+                case VerifyStatus.VerifiedOtherArea: return "Prawdziwy komunikat dla innego obszaru: " + Areas.Name(p.AreaCode) + ".";
+                case VerifyStatus.Expired: return "Prawdziwy, ale wygasł " + Ui.Time(p.ValidUntil) + ". Możliwe odtworzone nagranie.";
                 case VerifyStatus.Incomplete: return "Brakuje drugiego, niezależnego podpisu.";
                 default: return Messages.Summary(r.Status);
             }
@@ -176,21 +173,14 @@ namespace Sygnet.App.UI
             switch (r.Status)
             {
                 case VerifyStatus.Verified: return type.Instruction;
-                case VerifyStatus.VerifiedOtherArea: return "Komunikat nie dotyczy Twojego obszaru. " + type.Instruction;
+                case VerifyStatus.VerifiedOtherArea: return "Nie dotyczy Twojego obszaru. " + type.Instruction;
                 case VerifyStatus.Expired: return "Ten komunikat już nie obowiązuje. Słuchaj nowych, aktualnych komunikatów.";
-                case VerifyStatus.Incomplete:
-                    return "NIE WYKONUJ poleceń z tego komunikatu. Komunikat krytyczny musi mieć dwa podpisy.";
-                default:
-                    return "NIE WYKONUJ poleceń z tego komunikatu. Ufaj tylko komunikatom zweryfikowanym w SYGNET.";
+                case VerifyStatus.Incomplete: return "Nie wykonuj poleceń z tego komunikatu. Komunikat krytyczny musi mieć dwa podpisy.";
+                default: return "Nie wykonuj poleceń z tego komunikatu. Ufaj tylko komunikatom zweryfikowanym w SYGNET.";
             }
         }
 
-        string IssuerLabel(VerificationResult r)
-        {
-            var p = r.Payload;
-            if (r.IssuerName != null) return r.IssuerName;
-            return "nieznany nadawca (ID " + p.IssuerId + ")";
-        }
+        string IssuerLabel(VerificationResult r) => r.IssuerName ?? "nieznany nadawca (ID " + r.Payload.IssuerId + ")";
 
         IEnumerable<string> Names(VerificationResult r)
         {
@@ -200,27 +190,29 @@ namespace Sygnet.App.UI
 
         // ───────────── klocki ─────────────
 
-        RectTransform Card(Color color)
+        RectTransform Card(Color color, int padY = 36)
         {
             var img = Ui.Card(content, "Card", color);
-            Ui.VStack(img.rectTransform, 18, new RectOffset(48, 48, 40, 44));
+            Ui.VStack(img.rectTransform, 14, new RectOffset(44, 44, padY, padY + 4));
             return img.rectTransform;
         }
 
-        void Chip(string text)
+        static RectTransform Row(Transform parent, float spacing)
         {
-            var c = Card(new Color(1, 1, 1, 0.2f));
-            Ui.Text(c, text, Theme.TextSmall, OnColor, FontStyles.Bold, TextAlignmentOptions.Center);
+            var row = Ui.Rect(parent, "Row");
+            Ui.HStack(row, spacing, TextAnchor.MiddleLeft);
+            return row;
         }
 
-        static void Small(Transform parent, string text) =>
-            Ui.Text(parent, text, Theme.TextSmall - 4, OnColorMuted, FontStyles.Bold);
-
-        static void Line(Transform parent, string label, string value)
+        /// <summary>Wiersz „etykieta – wartość”; wartości techniczne (klucz, czas) monospace.</summary>
+        static void Detail(Transform parent, string label, string value, bool mono = false)
         {
-            var t = Ui.Text(parent, "", Theme.TextBody - 4, OnColor);
-            t.richText = true;
-            t.text = "<color=#FFFFFFB0>" + label + ":</color>  " + value;
+            var row = Row(parent, 20);
+            row.GetComponent<HorizontalLayoutGroup>().childAlignment = TextAnchor.UpperLeft;
+            var l = Ui.Label(row, label, TextStyle.Caption, OnMuted);
+            Ui.Layout(l, -1, -1, 230);
+            var v = Ui.Label(row, value, mono ? TextStyle.Mono : TextStyle.BodyStrong, On);
+            Ui.Layout(v, -1, -1, -1, 1);
         }
     }
 }
