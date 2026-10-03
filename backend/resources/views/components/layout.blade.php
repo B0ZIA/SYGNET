@@ -45,6 +45,16 @@
         </div>
     </header>
 
+    @if(! empty($boot['keyProblems']))
+        <div class="border-b border-danger/50 bg-danger/20 px-6 py-3 text-sm">
+            <div class="font-bold text-alarm">Klucze konsoli i trust store nie pasują do siebie – telefony mogą odrzucać komunikaty.</div>
+            @foreach($boot['keyProblems'] as $problem)
+                <div class="mt-1 text-ink">{{ $problem }}</div>
+            @endforeach
+            <div class="mt-1 text-muted">Diagnostyka na serwerze: <span class="mono">php artisan sygnet:check</span></div>
+        </div>
+    @endif
+
     <main class="flex-1 p-3 sm:p-5">
         {{ $slot }}
     </main>

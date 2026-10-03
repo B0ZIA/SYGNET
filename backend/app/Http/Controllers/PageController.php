@@ -9,6 +9,7 @@ use App\Sygnet\AttackFactory;
 use App\Sygnet\Broadcaster;
 use App\Sygnet\FrameBuilder;
 use App\Sygnet\IssuerRegistry;
+use App\Sygnet\KeyHealth;
 use App\Sygnet\KeyStore;
 use App\Sygnet\TrustStoreExporter;
 use Illuminate\Http\Response;
@@ -130,6 +131,7 @@ class PageController extends Controller
             'rootFingerprint' => $this->keys->has(KeyStore::ROOT) ? $this->keys->fingerprint(KeyStore::ROOT) : null,
             'testKeys' => $this->keys->has(KeyStore::ROOT) && $this->keys->fingerprint(KeyStore::ROOT) === '6A38-03D5-F059-902A',
             'noteMax' => 60,
+            'keyProblems' => KeyHealth::check($this->keys, TrustStoreExporter::fromConfig(), $this->issuers)['problems'],
             'qrPrefix' => FrameBuilder::QR_PREFIX,
         ];
     }

@@ -6,7 +6,7 @@ Operator tworzy komunikat, serwer podpisuje go Ed25519 (ext-sodium), a przegląd
 
 | Strona | Co robi |
 |---|---|
-| `/console` | formularz (nadawca, typ, obszar w zakresie nadawcy, ważność, dopisek ≤ 60 B UTF-8), podgląd telefonu na żywo, nadawanie dźwiękiem z wizualizacją tonów, QR, WAV, ramka hex w kolorach, historia |
+| `/console` | formularz (nadawca, typ, obszar w zakresie nadawcy, ważność, dopisek ≤ 60 B UTF-8), podgląd telefonu na żywo, nadawanie dźwiękiem z wizualizacją tonów, QR, WAV, plakat A4 z QR do druku (`/poster/{id}`, ważność do 7 dni), ramka hex w kolorach, historia |
 | `/attack` | laboratorium A1–A7: podszycie, modyfikacja, powtórka, przekroczenie uprawnień, brak 2. podpisu, nieznany nadawca, skradziony unieważniony klucz – każdy z oczekiwanym wynikiem i kontrolną weryfikacją |
 | `/keys` | odcisk ROOT, wydawcy i certyfikaty, unieważnianie (KEY_REVOKE od ROOT), pobranie `sygnet_trust_store.json` i `RootKey.cs` dla aplikacji |
 

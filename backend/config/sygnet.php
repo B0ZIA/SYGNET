@@ -76,5 +76,7 @@ return [
         'keys' => storage_path('app/keys'),
         'export' => storage_path('app/export'),
         'testvectors' => base_path('../testvectors/testvectors.json'),
+        // klucz ROOT wbudowany w aplikację (repo) – do sprawdzenia, czy konsola ma te same klucze co telefony
+        'app_root_key' => base_path('../SYGNET_Unity/Assets/Sygnet/App/RootKey.cs'),
     ],
 ];

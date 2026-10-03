@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Sygnet\FrameBuilder;
+use App\Sygnet\IssuerRegistry;
+use App\Sygnet\KeyStore;
+use App\Sygnet\TrustStoreExporter;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\UsesTestKeys;
@@ -107,6 +110,40 @@ class ConsoleApiTest extends TestCase
             ->assertSee('(7 dni)');
         $this->get('/poster/999999')->assertNotFound();
         $this->broadcast(['valid_minutes' => 99999])->assertStatus(422);
+    }
+
+    public function test_stale_trust_store_is_detected_and_rebuilt_from_existing_keys(): void
+    {
+        // jak na serwerze: klucze z laptopa (tu: testowe + 4, 7), ale stary eksport od innego ROOT
+        $other = new KeyStore($this->keysDir.DIRECTORY_SEPARATOR.'other');
+        $other->saveSeed(0, str_repeat('', 32));
+        $other->saveSeed(1, str_repeat('', 32));
+        file_put_contents(
+            TrustStoreExporter::fromConfig()->path('sygnet_trust_store.json'),
+            json_encode((new TrustStoreExporter($other, new IssuerRegistry))->build(1767225600, 1830297600)),
+        );
+        $appRootKey = $this->keysDir.DIRECTORY_SEPARATOR.'RootKey.cs';
+        file_put_contents($appRootKey, 'public const string Fingerprint = "6A38-03D5-F059-902A";');
+        config(['sygnet.paths.app_root_key' => $appRootKey]);
+
+        $this->broadcast()->assertJsonPath('check.reason', 'UNKNOWN_ISSUER:1');
+        $this->get('/console')->assertSee('nie pasują do siebie');
+        $this->artisan('sygnet:check')->assertFailed();
+
+        $this->artisan('sygnet:export')->assertSuccessful();
+        $this->artisan('sygnet:check')->assertSuccessful();
+        $this->broadcast()->assertJsonPath('check.status', 'VERIFIED');
+        $this->get('/console')->assertDontSee('nie pasują do siebie');
+    }
+
+    public function test_export_refuses_keys_unknown_to_the_app(): void
+    {
+        $appRootKey = $this->keysDir.DIRECTORY_SEPARATOR.'RootKey.cs';
+        file_put_contents($appRootKey, 'public const string Fingerprint = "82B7-E5B3-7129-166D";');
+        config(['sygnet.paths.app_root_key' => $appRootKey]);
+
+        $this->artisan('sygnet:check')->assertFailed();
+        $this->artisan('sygnet:export')->assertFailed();
     }
 
     public function test_sequence_starts_from_configured_number(): void

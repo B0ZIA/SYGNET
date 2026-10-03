@@ -132,6 +132,14 @@ ls storage/app/keys          # 0.seed … 7.seed + hacker.seed (9 plików)
 
 Klucze przesyłaj tylko przez `scp`/`rsync` – nie przez maila, komunikator ani repo.
 
+Sprawdź, czy klucze i trust store pasują do siebie i do aplikacji:
+
+```bash
+php artisan sygnet:check      # musi skończyć się: OK – klucze i trust store pasują do siebie
+```
+
+Wszystkie trzy odciski ROOT (z kluczy, w eksporcie, aplikacji) muszą być `82B7-E5B3-7129-166D`.
+
 ## 8. Cache Laravela
 
 ```bash
@@ -164,6 +172,7 @@ Klucze (`storage/app/keys`) i baza nie są w gicie – `git pull` ich nie rusza.
 | Objaw | Co zrobić |
 |---|---|
 | Błąd 500 | `tail -50 storage/logs/laravel.log` |
+| Kontrolna weryfikacja: `FORGED UNKNOWN_ISSUER:1`, czerwony pasek „Klucze konsoli i trust store nie pasują” | `php artisan sygnet:check` i zrób, co każe: **„Trust store jest od innego ROOT”** → `php artisan sygnet:export` (odtworzy eksport z kluczy na serwerze, bez nowych kluczy); **„Klucze konsoli … to nie te, które zna aplikacja”** → skopiuj `storage/app/keys` i `storage/app/export` z laptopa (krok 7). Potem `php artisan optimize` |
 | `Vite manifest not found` | krok 4 (brak `public/build`) |
 | `Table 'hackathon_api.broadcasts' doesn't exist` | krok 6 |
 | `Permission denied` w `storage/` | `chmod -R u+rwX storage bootstrap/cache` |
