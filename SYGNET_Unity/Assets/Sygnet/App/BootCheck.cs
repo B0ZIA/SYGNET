@@ -49,8 +49,9 @@ namespace Sygnet.App
 
                 bool tv1Ok = CheckQr(sb, trust, Tv1Qr, "TV1", VerifyStatus.Verified, "OK");
                 bool tv3Ok = CheckQr(sb, trust, Tv3Qr, "TV3", VerifyStatus.Forged, "BAD_SIGNATURE:1");
+                bool modemOk = CheckModem(sb);
 
-                ok = fpOk && trustOk && tv1Ok && tv3Ok;
+                ok = fpOk && trustOk && tv1Ok && tv3Ok && modemOk;
             }
             catch (Exception e)
             {
@@ -140,6 +141,24 @@ namespace Sygnet.App
             bool ok = r.Status == expected && r.ReasonCode == reason;
             var what = r.Payload != null ? AlertTypes.Get(r.Payload.Type).Name + ", " + r.IssuerName : "";
             Line(sb, ok, label + " → " + Messages.Title(r.Status) + " <size=80%>(" + r.ReasonCode + ")</size>\n      <size=80%>" + what + "</size>");
+            return ok;
+        }
+
+        /// <summary>Modem w pętli zwrotnej (TV1, 2 powtórzenia) + czas dekodowania na urządzeniu (IL2CPP).</summary>
+        static bool CheckModem(StringBuilder sb)
+        {
+            Frame.TryFromQrText(Tv1Qr, out var frame);
+            const int sr = 48000;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var x = ModemEncoder.Encode(frame, sr);
+            long encMs = sw.ElapsedMilliseconds;
+            sw.Restart();
+            var frames = ModemDecoder.Decode(x, sr);
+            long decMs = sw.ElapsedMilliseconds;
+            bool ok = frames.Count == 1 && Bytes.SequenceEqual(frames[0], frame);
+            double audioS = x.Length / (double)sr;
+            Line(sb, ok, "Modem: " + audioS.ToString("0.0") + " s audio\n      <size=80%>kodowanie " + encMs +
+                         " ms, dekodowanie " + decMs + " ms</size>");
             return ok;
         }
 
