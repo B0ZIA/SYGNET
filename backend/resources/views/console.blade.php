@@ -177,7 +177,7 @@
             </div>
             <p class="mt-5 text-sm text-muted">
                 Drugi podpis złoży <b class="text-ink" x-text="boot.issuers.find(i => i.id === form.second_signer_id)?.name"></b>
-                własnym kluczem. Na demo zatwierdzenie to PIN (1234) – podpis i tak jest naprawdę podwójny.
+                własnym kluczem. Zatwierdza PIN-em drugiego operatora – podpis i tak jest naprawdę podwójny (dwa klucze).
             </p>
             <input type="password" inputmode="numeric" class="input mono mt-4 text-center !text-2xl tracking-[0.5em]" x-model="pin"
                    placeholder="PIN" x-effect="pinOpen && $nextTick(() => $el.focus())">
