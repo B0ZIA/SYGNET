@@ -4,35 +4,41 @@ namespace App\Sygnet;
 
 final class Areas
 {
-    public static function covers(int $issuerId, int $areaCode): bool
-    {
-        $issuers = config('sygnet.issuers', []);
+    /**
+     * @param int[] $allowedAreas
+     */
+    public static function covers(
+        array $allowedAreas,
+        int $targetArea
+    ): bool {
+        foreach ($allowedAreas as $allowed) {
+            $allowed = (int) $allowed;
 
-        if (!isset($issuers[$issuerId])) {
-            return false;
-        }
-
-        $scopes = $issuers[$issuerId]['scopes'] ?? [];
-
-        if (in_array(0, $scopes, true)) {
-            return true;
-        }
-
-        if ($areaCode === 0) {
-            return false;
-        }
-
-        foreach ($scopes as $scope) {
-            if ($scope === $areaCode) {
+            /*
+             * 0 = entire Poland
+             */
+            if ($allowed === 0) {
                 return true;
             }
 
-            // Województwo obejmuje konkretne miasto.
-            if ($scope === 14 && $areaCode === 1465) {
+            /*
+             * Exact area.
+             */
+            if ($allowed === $targetArea) {
                 return true;
             }
 
-            if ($scope === 12 && $areaCode === 1261) {
+            /*
+             * Province -> city.
+             *
+             * Mazowieckie 14 covers Warsaw 1465.
+             * Małopolskie 12 covers Kraków 1261.
+             */
+            if ($allowed === 14 && $targetArea === 1465) {
+                return true;
+            }
+
+            if ($allowed === 12 && $targetArea === 1261) {
                 return true;
             }
         }
@@ -40,8 +46,15 @@ final class Areas
         return false;
     }
 
-    public static function name(int $areaCode): ?string
+    public static function name(int $areaCode): string
     {
-        return config("sygnet.areas.$areaCode");
+        return match ($areaCode) {
+            0 => 'Polska',
+            14 => 'woj. mazowieckie',
+            12 => 'woj. małopolskie',
+            1465 => 'Warszawa',
+            1261 => 'Kraków',
+            default => "Obszar {$areaCode}",
+        };
     }
 }
