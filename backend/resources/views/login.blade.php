@@ -31,6 +31,7 @@
             @include('partials.jury-info', ['items' => [
                 'Hasło do konsoli' => config('sygnet.console_password'),
                 'PIN drugiego operatora (ewakuacja)' => config('sygnet.second_operator_pin'),
+                'Na szybko (2 min)' => 'Laboratorium ataków → „Uruchom” przy dowolnym ataku (telefon obok słucha)',
             ]])
         </div>
     </form>

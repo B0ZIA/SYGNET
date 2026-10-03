@@ -4,7 +4,7 @@ import { Transmitter, encode, toWav, durationSeconds, WAV_SAMPLE_RATE } from './
 import { draw } from './waveform';
 import { phoneView, previewView } from './phone';
 import { icon } from './icons';
-import { segments, SEGMENT_CLASS, hexToBytes, utf8Length, frameSize, diffIndices, download, clock, dateTime } from './frame';
+import { segments, SEGMENT_CLASS, hexToBytes, utf8Length, frameSize, download, clock, dateTime } from './frame';
 
 import.meta.glob(['../images/**'], { eager: true });             // logo przez Vite::asset()
 
@@ -282,64 +282,53 @@ Alpine.data('consoleApp', () => ({
 }));
 
 // ───────────── /attack ─────────────
+// Dla oceniającego: lista ataków, każdy z własnym przyciskiem „Uruchom”, wynik telefonu i jedno zdanie „dlaczego”.
 Alpine.data('attackLab', () => ({
     boot,
     attacks: boot.attacks,
     results: {},
     busy: null,
     selected: null,
-    errors: {},
-    genuine: [],
-    inputs: {
-        A1: { victim_id: 1, type: 1, note: 'Mobilizacja: stawić się w jednostkach do 18:00' },
-        A2: { broadcast_id: null, note: 'Schron: NIE schodźcie do metra' },
-        A3: { broadcast_id: null },
-        A7: { issuer_id: null },
-    },
+    error: null,
 
-    init() {
-        this.loadGenuine();
-    },
-
-    async loadGenuine() {
-        const r = await api('GET', '/api/broadcasts?limit=50&kind=genuine');
-        if (r.ok) this.genuine = r.data.filter((b) => b.type !== 250);
-    },
-
-    get expired() { return this.genuine.filter((b) => b.valid_until < Date.now() / 1000); },
-    get revoked() { return this.boot.issuers.filter((i) => i.revoked); },
+    get order() { return Object.keys(this.attacks); },
+    get done() { return Object.keys(this.results).length; },
+    get blocked() { return Object.values(this.results).filter((r) => r.as_expected).length; },
     get phone() { return phoneView(this.selected); },
-    get hexDiff() { return this.selected?.attack_type === 'A2' ? this.diff('A2') : new Set(); },
 
-    async run(code, action) {
-        if (action === 'play') this.$store.tx.unlock();
-        let b = action === 'play' || !this.results[code] ? null : this.results[code];
-        if (!b) {
-            this.busy = code;
-            this.errors[code] = null;
-            const r = await api('POST', `/api/attack/${code}`, this.inputs[code] ?? {});
-            this.busy = null;
-            if (!r.ok) {
-                this.errors[code] = r.data.message ?? 'Błąd';
-                return;
-            }
-            b = r.data;
-            this.results[code] = b;
+    async generate(code) {
+        this.busy = code;
+        this.error = null;
+        const r = await api('POST', `/api/attack/${code}`, {});
+        this.busy = null;
+        if (!r.ok) {
+            this.error = `${code}: ${r.data.message ?? 'błąd serwera'}`;
+            return null;
         }
+        this.results[code] = r.data;
+        return r.data;
+    },
+
+    show(b) {
         this.selected = b;
         this.$store.tx.select(b);
-        if (action === 'play') this.$store.tx.play(b);
-        if (action === 'qr') this.$store.qr.show(b);
-        if (action === 'wav') this.$store.tx.wav(b);
     },
 
-    /** Dla A2: które bajty różnią się od oryginału (dopisek + CRC, podpis zostaje stary). */
-    diff(code) {
-        const b = this.results[code];
-        if (code !== 'A2' || !b) return new Set();
-        const original = this.genuine.find((g) => g.issuer_id === b.issuer_id && g.sequence === b.sequence);
-        return original ? diffIndices(original.frame_hex, b.frame_hex) : new Set();
+    /** Kliknięcie wiersza z wynikiem: pokaż go jeszcze raz na telefonie. */
+    pick(code) {
+        if (this.results[code]) this.show(this.results[code]);
     },
+
+    /** „Uruchom”: nowa ramka ataku, od razu nadana dźwiękiem (telefon słucha) i wynik na podglądzie telefonu. */
+    async launch(code) {
+        if (this.$store.tx.playing) return;
+        this.$store.tx.unlock();                 // w kliknięciu – przeglądarka wymaga gestu, zanim zagra dźwięk
+        const b = await this.generate(code);
+        if (!b) return;
+        this.show(b);
+        this.$store.tx.play(b);
+    },
+
 }));
 
 // ───────────── /keys ─────────────
@@ -349,8 +338,7 @@ Alpine.data('keysPage', () => ({
     busy: false,
     error: null,
     result: null,
-
-    get phone() { return phoneView(this.result); },
+    revokeId: boot.issuerRows?.find((r) => r.in_trust_store && !r.revoked)?.id ?? null,
 
     async revoke() {
         const issuer = this.confirm;
@@ -367,6 +355,7 @@ Alpine.data('keysPage', () => ({
         this.$store.tx.select(r.data);
         const row = this.boot.issuerRows.find((x) => x.id === issuer.id);
         if (row) row.revoked = true;
+        this.revokeId = this.boot.issuerRows.find((r) => r.in_trust_store && !r.revoked)?.id ?? null;
     },
 
     act(action) {

@@ -25,38 +25,38 @@ final class AttackFactory
     {
         return [
             'A1' => [
-                'title' => 'Podszycie się pod nadawcę',
-                'what' => 'Atakujący pisze własny komunikat i podaje się za Dowództwo Operacyjne. Nie ma jego klucza, więc podpisuje swoim.',
+                'title' => 'Podszycie się pod wojsko',
+                'what' => 'Haker podpisuje alarm własnym kluczem i podaje się za Dowództwo Operacyjne.',
                 'expect' => 'FORGED', 'reason' => 'BAD_SIGNATURE',
             ],
             'A2' => [
-                'title' => 'Modyfikacja prawdziwego komunikatu',
-                'what' => 'Bierze prawdziwą ramkę z historii, zmienia dopisek, zostawia oryginalny podpis i przelicza CRC.',
+                'title' => 'Podmiana treści',
+                'what' => 'Bierze prawdziwy komunikat i zmienia jego treść. Podpis zostaje stary.',
                 'expect' => 'FORGED', 'reason' => 'BAD_SIGNATURE',
             ],
             'A3' => [
-                'title' => 'Powtórka starego nagrania',
-                'what' => 'Odtwarza bajt w bajt prawdziwy alarm sprzed 3 dni – podpis jest poprawny, ale komunikat wygasł.',
+                'title' => 'Stare nagranie',
+                'what' => 'Odtwarza bajt w bajt prawdziwy alarm sprzed 3 dni.',
                 'expect' => 'EXPIRED', 'reason' => 'EXPIRED',
             ],
             'A4' => [
-                'title' => 'Przekroczenie uprawnień',
-                'what' => 'Prawdziwy klucz Prezydenta Warszawy podpisuje alarm dla Krakowa – poza swoim zakresem.',
+                'title' => 'Cudzy teren',
+                'what' => 'Prezydent Warszawy (prawdziwy klucz) ogłasza alarm w Krakowie.',
                 'expect' => 'FORGED', 'reason' => 'UNAUTHORIZED_AREA',
             ],
             'A5' => [
-                'title' => 'Ewakuacja bez drugiego podpisu',
-                'what' => 'Jeden operator (np. przekupiony) wydaje ewakuację sam. Typ krytyczny wymaga dwóch niezależnych podpisów.',
+                'title' => 'Ewakuacja z jednym podpisem',
+                'what' => 'Jeden urząd sam ogłasza ewakuację. Wymagane są dwa niezależne podpisy.',
                 'expect' => 'INCOMPLETE', 'reason' => 'DUAL_SIGNATURE_REQUIRED',
             ],
             'A6' => [
-                'title' => 'Nieznany nadawca',
-                'what' => 'Wymyślony urząd (ID 42) z kluczem atakującego – nie ma go w trust store podpisanym przez ROOT.',
+                'title' => 'Zmyślony urząd',
+                'what' => '„Urząd ds. Ewakuacji” spoza listy zaufanych nadawców.',
                 'expect' => 'FORGED', 'reason' => 'UNKNOWN_ISSUER',
             ],
             'A7' => [
-                'title' => 'Skradziony, unieważniony klucz',
-                'what' => 'Atakujący ukradł prawdziwy klucz. Po unieważnieniu (strona Klucze → KEY_REVOKE od ROOT) telefon go odrzuca.',
+                'title' => 'Skradziony klucz',
+                'what' => 'Prawdziwy klucz urzędu, ale unieważniony już przez klucz główny.',
                 'expect' => 'FORGED', 'reason' => 'REVOKED_ISSUER',
             ],
         ];

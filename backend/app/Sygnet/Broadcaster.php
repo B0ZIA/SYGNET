@@ -90,7 +90,8 @@ final class Broadcaster
     }
 
     /** Wynik weryfikacji na telefonie z naszym trust store (zakładamy, że dotarły do niego nasze unieważnienia). */
-    public function check(string $frame, ?int $userArea = null, ?int $now = null): ?array
+    /** @param int[] $assumeRevoked dodatkowo unieważnieni wydawcy (scenariusz „telefon dostał już KEY_REVOKE”) */
+    public function check(string $frame, ?int $userArea = null, ?int $now = null, array $assumeRevoked = []): ?array
     {
         $trust = $this->trust();
         if ($trust === null) {
@@ -99,7 +100,8 @@ final class Broadcaster
 
         $verifier = new FrameVerifier($trust);
         $userArea ??= (int) config('sygnet.demo_user_area');
-        $r = $verifier->verify($frame, $now ?? time(), $userArea, $this->revokedIssuers());
+        $revoked = array_values(array_unique(array_merge($this->revokedIssuers(), $assumeRevoked)));
+        $r = $verifier->verify($frame, $now ?? time(), $userArea, $revoked);
 
         return [
             'status' => $r['status'],
@@ -112,7 +114,7 @@ final class Broadcaster
     }
 
     /** Odpowiedź API dla ramki z historii. */
-    public function present(Broadcast $b, ?int $userArea = null): array
+    public function present(Broadcast $b, ?int $userArea = null, array $assumeRevoked = []): array
     {
         $frame = $b->frame();
         $p = FrameBuilder::parse($frame)['payload'];
@@ -144,7 +146,7 @@ final class Broadcaster
             'bytes' => strlen($frame),
             'audio_seconds' => FrameBuilder::audioSeconds(strlen($frame), $repeat),
             'created_at' => $b->created_at?->toIso8601String(),
-            'check' => $this->check($frame, $userArea),
+            'check' => $this->check($frame, $userArea, null, $assumeRevoked),
         ];
     }
 }

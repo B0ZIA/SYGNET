@@ -57,11 +57,14 @@ export function draw(canvas, st) {
     g.fillStyle = '#ffffff06';
     g.fillRect(0, y(3000 + 50), plotW, y(1500 - 50) - y(3000 + 50));
     g.fillRect(0, y(4700 + 50), plotW, y(3200 - 50) - y(4700 + 50));
-    if (st.frame?.length) {
+    if (st.frame?.length && h >= 90) {
         g.font = '600 10px "JetBrains Mono", monospace';
         g.fillStyle = '#5B6570';
         g.fillText('B 3200–4700 Hz', 6, y(4700) - 4);
         g.fillText('A 1500–3000 Hz', 6, y(3000) - 4);
+    }
+
+    if (st.frame?.length) {
 
         const { tones, total } = plan(st.frame, st.repeat);
         const now = st.progress * total;

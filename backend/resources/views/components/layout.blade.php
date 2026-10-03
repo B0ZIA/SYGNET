@@ -33,9 +33,6 @@
                 ROOT {{ $boot['rootFingerprint'] ?? 'brak – php artisan sygnet:init' }}
                 @if($boot['testKeys'] ?? false)<span class="text-expired">· test</span>@endif
             </span>
-            <span class="chip border-go/40 text-go" title="Konsola działa bez internetu i CDN">
-                <span class="size-2 rounded-full bg-go blink"></span> OFFLINE
-            </span>
             @if(\App\Http\Middleware\ConsolePassword::enabled())
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf

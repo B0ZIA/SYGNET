@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Sygnet\AttackFactory;
+use App\Sygnet\Broadcaster;
 use App\Sygnet\FrameBuilder;
 use App\Sygnet\IssuerRegistry;
 use App\Sygnet\KeyStore;
@@ -205,6 +207,21 @@ class ConsoleApiTest extends TestCase
         $this->assertSame('BAD_SIGNATURE:1', $a1['check']['reason']);
         $this->assertSame('UNKNOWN_ISSUER:42', $this->postJson('/api/attack/A6')->json('check.reason'));
         $this->assertSame('UNAUTHORIZED_AREA:6', $this->postJson('/api/attack/A4')->json('check.reason'));
+    }
+
+    public function test_stolen_key_attack_assumes_revoked_key_without_revoking(): void
+    {
+        $a7 = $this->postJson('/api/attack/A7')->assertCreated();
+        $a7->assertJsonPath('as_expected', true)->assertJsonPath('check.reason', 'REVOKED_ISSUER:6');
+        $this->broadcast(['issuer_id' => 1])->assertCreated();                 // nic nie zostało naprawdę unieważnione
+        $this->assertSame([], Broadcaster::fromConfig()->revokedIssuers());
+    }
+
+    public function test_all_attacks_are_blocked_out_of_the_box(): void
+    {
+        foreach (array_keys(AttackFactory::catalog()) as $attack) {
+            $this->postJson("/api/attack/{$attack}")->assertCreated()->assertJsonPath('as_expected', true);
+        }
     }
 
     public function test_tampered_frame_keeps_original_signature(): void

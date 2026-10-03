@@ -91,7 +91,8 @@ class BroadcastController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
-        $out = $this->broadcaster->present($b);
+        // A7 zakłada telefon, który dostał już unieważnienie skradzionego klucza (KEY_REVOKE od ROOT)
+        $out = $this->broadcaster->present($b, null, strtoupper($type) === 'A7' ? [$b->issuer_id] : []);
         $meta = AttackFactory::catalog()[strtoupper($type)];
         $out['expected'] = ['status' => $meta['expect'], 'reason' => $meta['reason']];
         $out['as_expected'] = $out['check'] !== null && $out['check']['status'] === $meta['expect']
