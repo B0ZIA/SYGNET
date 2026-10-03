@@ -34,10 +34,18 @@ namespace Sygnet.App.UI
             // ── górny pasek: logo (5× tap = zegar testowy) + obszar ──
             var top = Ui.Rect(Safe, "TopBar");
             Ui.Top(top, 48, 120, Theme.Padding);
-            var logo = Ui.Text(top, "SYGNET", 76, Theme.Text, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
-            logo.characterSpacing = 12;
-            logo.rectTransform.anchorMax = new Vector2(0.6f, 1);
-            Ui.HitArea(logo.rectTransform, OnLogoTap);
+            var brand = Ui.Rect(top, "Brand");
+            brand.anchorMax = new Vector2(0.55f, 1);
+            var mark = Ui.Image(brand, "Mark", Color.white, Resources.Load<Sprite>("sygnet_logo"));
+            mark.preserveAspect = true;
+            mark.rectTransform.anchorMin = new Vector2(0, 0);
+            mark.rectTransform.anchorMax = new Vector2(0, 1);
+            mark.rectTransform.pivot = new Vector2(0, 0.5f);
+            mark.rectTransform.sizeDelta = new Vector2(120, 0);
+            var logo = Ui.Text(brand, "SYGNET", 64, Theme.Text, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            logo.characterSpacing = 10;
+            Ui.Stretch(logo.rectTransform, 136, 0, 0, 0);
+            Ui.HitArea(brand, OnLogoTap);
 
             var chip = Ui.Card(top, "AreaChip", Theme.Card, 48);
             chip.rectTransform.anchorMin = new Vector2(0.55f, 0.1f);
