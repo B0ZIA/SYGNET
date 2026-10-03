@@ -59,6 +59,9 @@ return [
 
     'repeat_default' => 2,
 
+    // hasło do całej konsoli (serwer publiczny bez dostępu do nginx); puste = bez logowania (lokalnie, offline)
+    'console_password' => (string) env('SYGNET_CONSOLE_PASSWORD', ''),
+
     // PIN „drugiego operatora” przy komunikacie krytycznym – tylko na demo, podpis i tak jest podwójny
     'second_operator_pin' => env('SYGNET_SECOND_PIN', '1234'),
 

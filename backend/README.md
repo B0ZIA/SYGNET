@@ -50,7 +50,7 @@ Po podmianie trzeba zbudować APK od nowa. Nowe klucze = telefony ze starym ROOT
 
 ## Uruchomienie
 
-Wdrożenie na serwer (VPS, nginx, HTTPS, hasło, przeniesienie kluczy): **[DEPLOY.md](DEPLOY.md)**.
+Wdrożenie na serwer (bez sudo, MySQL, hasło do konsoli, przeniesienie kluczy): **[DEPLOY.md](DEPLOY.md)**.
 
 ```bash
 php artisan serve        # http://127.0.0.1:8000 → /console
@@ -82,6 +82,7 @@ npm test             # modem JS = pliki testvectors/*.wav (±1 LSB), WAV, zaokr�
 ## Bezpieczeństwo
 
 - Klucze prywatne nigdy nie trafiają do przeglądarki – podpisuje wyłącznie backend; przeglądarka dostaje gotowe bajty.
+- Na serwerze publicznym konsola jest za hasłem: `SYGNET_CONSOLE_PASSWORD` w `.env` (puste = bez logowania, tylko lokalnie).
 - Seedy nie są logowane; eksport zawiera tylko klucze publiczne.
 - Na demo klucze leżą w plikach. **Produkcyjnie:** HSM / karta kryptograficzna u każdego operatora, ROOT offline.
 - Typy krytyczne wymagają dwóch podpisów różnych wydawców – ta reguła jest zaszyta w aplikacji, nie w ramce.

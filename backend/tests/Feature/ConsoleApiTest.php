@@ -56,6 +56,31 @@ class ConsoleApiTest extends TestCase
         $this->assertSame(1, $this->broadcast(['issuer_id' => 7])->json('sequence'));
     }
 
+    public function test_console_password_protects_pages_and_api(): void
+    {
+        config(['sygnet.console_password' => 'tajne-haslo']);
+
+        $this->get('/console')->assertRedirect('/login');
+        $this->postJson('/api/broadcast', [])->assertUnauthorized();
+        $this->get('/keys/export/RootKey.cs')->assertRedirect('/login');
+
+        $this->post('/login', ['password' => 'zle'])->assertSessionHasErrors('password');
+        $this->get('/console')->assertRedirect('/login');
+
+        $this->post('/login', ['password' => 'tajne-haslo'])->assertRedirect('/console');
+        $this->get('/console')->assertOk()->assertSee('Wyloguj');
+        $this->broadcast()->assertCreated();
+
+        config(['sygnet.console_password' => 'nowe-haslo']);               // zmiana hasła wylogowuje
+        $this->get('/console')->assertRedirect('/login');
+    }
+
+    public function test_login_page_without_password_goes_to_console(): void
+    {
+        $this->get('/login')->assertRedirect('/console');
+        $this->get('/console')->assertOk()->assertDontSee('Wyloguj');
+    }
+
     public function test_sequence_starts_from_configured_number(): void
     {
         config(['sygnet.sequence_start' => 1000]);

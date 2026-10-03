@@ -17,6 +17,9 @@ async function api(method, url, body) {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrf },
         body: body ? JSON.stringify(body) : undefined,
     });
+    if (res.status === 401) {
+        window.location.href = '/login';             // hasło konsoli: sesja wygasła
+    }
     const data = await res.json().catch(() => ({}));
     return { ok: res.ok, status: res.status, data };
 }
