@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Sygnet\KeyStore;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,6 +16,6 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        //
+        Schema::defaultStringLength(191);     // indeksy utf8mb4 także na starszym MySQL/MariaDB
     }
 }

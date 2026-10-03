@@ -36,12 +36,16 @@ final class Broadcaster
         return new FrameBuilder($this->keys);
     }
 
-    /** Licznik osobno dla każdego wydawcy (max + 1), tylko prawdziwe komunikaty. */
+    /**
+     * Licznik osobno dla każdego wydawcy (max + 1), tylko prawdziwe komunikaty. Nie mniej niż sygnet.sequence_start:
+     * nowa baza (np. na serwerze) nie może zacząć od numerów, które telefony już widziały – uznałyby je za DUPLICATE.
+     */
     public function nextSequence(int $issuerId): int
     {
+        $start = min(0xFFFF, max(1, (int) config('sygnet.sequence_start', 1)));
         $max = (int) Broadcast::genuine()->where('issuer_id', $issuerId)->max('sequence');
 
-        return $max >= 0xFFFF ? 1 : $max + 1;
+        return $max >= 0xFFFF ? $start : max($start, $max + 1);
     }
 
     /** @param int[] $signers */

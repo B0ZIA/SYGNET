@@ -1,6 +1,6 @@
 # Wdrożenie konsoli SYGNET na VPS
 
-Instrukcja dla Ubuntu 22.04 / 24.04 (nginx + PHP-FPM + SQLite). Konsola to zwykła aplikacja Laravel –
+Instrukcja dla Ubuntu 22.04 / 24.04 (nginx + PHP-FPM + MySQL). Konsola to zwykła aplikacja Laravel –
 **dźwięk gra przeglądarka komputera, na którym otwierasz stronę**, więc serwer tylko serwuje stronę i podpisuje ramki.
 
 ## 0. Zanim zaczniesz – 3 rzeczy, które łatwo zepsuć
@@ -13,14 +13,17 @@ Instrukcja dla Ubuntu 22.04 / 24.04 (nginx + PHP-FPM + SQLite). Konsola to zwyk�
    Dlatego w nginx **obowiązkowo** hasło (HTTP Basic Auth, krok 8) i HTTPS.
 3. **Zegar serwera.** Telefon odrzuca komunikat z czasem z przyszłości (> 5 min) i oznacza stary jako NIEAKTUALNY.
    Sprawdź: `timedatectl` → `System clock synchronized: yes`.
+4. **Numeracja komunikatów.** Każdy wydawca ma licznik (`sequence`), a telefon pamięta, które numery już dostał.
+   Nowa baza na serwerze zaczęłaby od 1 – telefony testowe, które słyszały konsolę z laptopa, uznałyby pierwsze
+   komunikaty za „już otrzymane” i nic by nie pokazały. Dlatego w `.env` jest `SYGNET_SEQUENCE_START=1000` (krok 4).
 
 ## 1. Pakiety
 
 ```bash
 sudo apt update
 sudo apt install -y nginx git unzip curl apache2-utils \
-    php8.3-fpm php8.3-cli php8.3-sqlite3 php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-intl
-php -m | grep -E 'sodium|pdo_sqlite'      # oba muszą być (sodium jest w php8.3-common)
+    php8.3-fpm php8.3-cli php8.3-mysql php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-intl
+php -m | grep -E 'sodium|pdo_mysql'       # oba muszą być (sodium jest w php8.3-common)
 ```
 
 Na Ubuntu 22.04 nie ma PHP 8.3 w standardowych repozytoriach – najpierw `sudo add-apt-repository ppa:ondrej/php`.
@@ -51,7 +54,23 @@ npm ci
 npm run build              # → public/build (fonty, JS, CSS – bez CDN)
 ```
 
-## 4. Konfiguracja `.env`
+## 4. Baza MySQL i `.env`
+
+Baza i użytkownik (MySQL ≥ 5.7.8 albo MariaDB ≥ 10.2.7 – potrzebny typ JSON):
+
+```bash
+sudo mysql
+```
+
+```sql
+CREATE DATABASE sygnet CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'sygnet'@'localhost' IDENTIFIED BY 'TU_SILNE_HASLO';
+GRANT ALL PRIVILEGES ON sygnet.* TO 'sygnet'@'localhost';
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+`utf8mb4` jest konieczne – dopiski i nazwy wydawców mają polskie znaki.
 
 ```bash
 cp .env.example .env
@@ -68,16 +87,26 @@ APP_DEBUG=false
 APP_URL=https://sygnet.twojadomena.pl
 APP_LOCALE=pl
 
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=sygnet
+DB_USERNAME=sygnet
+DB_PASSWORD=TU_SILNE_HASLO
+
 SESSION_SECURE_COOKIE=true
 
 SYGNET_USER_AREA=1261          # obszar telefonu w podglądzie (1261 = Kraków)
 SYGNET_SECOND_PIN=1234         # PIN drugiego operatora przy ewakuacji – na serwerze ustaw inny
+SYGNET_SEQUENCE_START=1000     # numery komunikatów od 1000 – patrz punkt 0.4
 ```
 
-Baza SQLite:
+W `.env.example` linie `DB_HOST` … `DB_PASSWORD` są zakomentowane (`#`) – usuń `#` albo dopisz je jak wyżej.
+Jeśli MySQL jest na innym serwerze, podaj jego adres w `DB_HOST` i nadaj uprawnienia `'sygnet'@'ADRES_VPS'`.
+
+Tabele:
 
 ```bash
-touch database/database.sqlite
 php artisan migrate --force
 ```
 
@@ -105,8 +134,8 @@ nie przez maila, komunikator ani repo.
 ## 6. Uprawnienia i cache
 
 ```bash
-sudo chown -R www-data:www-data storage bootstrap/cache database
-sudo chmod -R ug+rwX storage bootstrap/cache database
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chmod -R ug+rwX storage bootstrap/cache
 php artisan optimize          # cache konfiguracji, tras i widoków
 ```
 
@@ -185,13 +214,18 @@ php artisan optimize
 sudo systemctl reload php8.3-fpm
 ```
 
-Klucze w `storage/app/keys` i baza w `database/database.sqlite` są poza gitem – `git pull` ich nie rusza.
+Klucze w `storage/app/keys` są poza gitem, a historia nadań w MySQL – `git pull` ich nie rusza.
+Kopia historii: `mysqldump -u sygnet -p sygnet > sygnet_$(date +%F).sql`. Kopię kluczy trzymaj poza serwerem (np. na pendrivie).
 
 ## 11. Gdy coś nie działa
 
 | Objaw | Co sprawdzić |
 |---|---|
 | Błąd 500 | `tail -50 storage/logs/laravel.log`; uprawnienia z kroku 6 |
+| `SQLSTATE[HY000] [1045] Access denied` | `DB_USERNAME` / `DB_PASSWORD` w `.env`, uprawnienia `GRANT` z kroku 4 |
+| `SQLSTATE[HY000] [2002]` | MySQL nie działa (`systemctl status mysql`) albo zły `DB_HOST` / `DB_PORT` |
+| `could not find driver` | brak `php8.3-mysql` → `sudo apt install php8.3-mysql && sudo systemctl reload php8.3-fpm` |
+| Telefon nie reaguje na nowe komunikaty z serwera (bez błędu) | telefon ma te numery już za sobą – ustaw `SYGNET_SEQUENCE_START` wyżej (np. 2000) i `php artisan optimize`; albo w aplikacji: 5× dotknij logo → „Wyczyść skrzynkę i pamięć odbioru” |
 | W nagłówku „ROOT brak”, przy podpisie „Konsola nie ma klucza tego nadawcy” | klucze nie zostały skopiowane albo www-data nie może ich czytać (krok 5) – **nie** uruchamiaj `sygnet:init` |
 | Telefon pokazuje FAŁSZYWKA dla każdego komunikatu | inny ROOT niż w aplikacji – porównaj odcisk na stronie Klucze |
 | Telefon pokazuje „Podejrzany czas wydania” | zegar serwera (`timedatectl`) |

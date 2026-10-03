@@ -110,8 +110,8 @@ final class AttackFactory
     {
         $old = $broadcastId !== null
             ? $this->genuine($broadcastId)
-            : Broadcast::genuine()->where('type', '!=', AlertTypes::KEY_REVOKE)
-                ->whereRaw('timestamp + valid_minutes * 60 < ?', [time()])->latest('id')->first();
+            : Broadcast::genuine()->where('type', '!=', AlertTypes::KEY_REVOKE)->latest('id')->get()
+                ->first(fn (Broadcast $b) => $b->validUntil() < time());
 
         $old ??= $this->seedHistory()[0];
 

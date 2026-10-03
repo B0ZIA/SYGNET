@@ -56,6 +56,22 @@ class ConsoleApiTest extends TestCase
         $this->assertSame(1, $this->broadcast(['issuer_id' => 7])->json('sequence'));
     }
 
+    public function test_sequence_starts_from_configured_number(): void
+    {
+        config(['sygnet.sequence_start' => 1000]);
+
+        $this->assertSame(1000, $this->broadcast()->json('sequence'));
+        $this->assertSame(1001, $this->broadcast()->json('sequence'));
+    }
+
+    public function test_replay_uses_expired_genuine_broadcast(): void
+    {
+        $this->artisan('sygnet:seed-history')->assertSuccessful();
+        $this->broadcast()->assertCreated();                       // świeży – nie nadaje się do powtórki
+
+        $this->postJson('/api/attack/A3')->assertCreated()->assertJsonPath('check.status', 'EXPIRED');
+    }
+
     public function test_note_limited_to_60_bytes_of_utf8(): void
     {
         $this->broadcast(['note' => str_repeat('A', 61)])->assertStatus(422)->assertJsonValidationErrors('note');

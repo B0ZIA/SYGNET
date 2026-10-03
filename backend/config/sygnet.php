@@ -52,6 +52,9 @@ return [
     // obszar telefonu odbiorcy w podglądzie i w kontrolnej weryfikacji (demo: HackYeah w Krakowie)
     'demo_user_area' => (int) env('SYGNET_USER_AREA', 1261),
 
+    // pierwszy numer sequence w nowej bazie (np. 1000 na serwerze, jeśli telefony widziały numery z laptopa)
+    'sequence_start' => (int) env('SYGNET_SEQUENCE_START', 1),
+
     'validity_options' => [30, 120, 1440],
 
     'repeat_default' => 2,
