@@ -16,6 +16,7 @@ namespace Sygnet.App
     /// <summary>
     /// Bootstrap i stan aplikacji: trust store (zweryfikowany wbudowanym ROOT), Storage, nawigacja ekranów
     /// i jedna ścieżka odbioru ramki: Verify → Commit → skrzynka → alarm → ekran wyniku.
+    /// W tle (Android) zamiast ekranu wyniku – powiadomienie; po powrocie do aplikacji pokazujemy ten wynik.
     /// </summary>
     public class SygnetApp : MonoBehaviour
     {
@@ -36,9 +37,24 @@ namespace Sygnet.App
         public HomeScreen Home { get; private set; }
         public ScanScreen Scan { get; private set; }
         public ResultScreen Result { get; private set; }
+        public InboxScreen Inbox { get; private set; }
+        public AboutScreen About { get; private set; }
+        public AreaScreen Area { get; private set; }
+        public OnboardingScreen Onboarding { get; private set; }
+        public DebugScreen DebugPanel { get; private set; }
+
+        /// <summary>Ostatnia odebrana ramka (QR lub dźwięk) – dla panelu diagnostycznego.</summary>
+        public byte[] LastFrame { get; private set; }
+        public FrameSource LastSource { get; private set; }
+        public VerificationResult LastResult { get; private set; }
+        public DateTime LastAt { get; private set; }
 
         long testClockOffset;
         public bool TestClock { get; private set; }
+
+        readonly object storeLock = new object();      // Store używa też wątek nasłuchu w tle
+        volatile InboxEntry pendingFromBackground;     // do pokazania po powrocie do aplikacji
+        int notificationId = 100;                      // 1 = stałe powiadomienie usługi nasłuchu
 
         /// <summary>Bieżący czas UTC (unix s); przy zegarze testowym przesunięty do czasu wektorów.</summary>
         public long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TestClock ? testClockOffset : 0);
@@ -55,7 +71,7 @@ namespace Sygnet.App
         void Awake()
         {
             Application.targetFrameRate = 60;
-            Screen.sleepTimeout = SleepTimeout.NeverSleep;     // nasłuch działa tylko przy aktywnej aplikacji
+            Screen.sleepTimeout = SleepTimeout.NeverSleep;     // na ekranie widać odbiór; zgaszony ekran = nasłuch w tle
 
             Store = new Storage(Application.persistentDataPath);
             Store.Load();
@@ -68,15 +84,28 @@ namespace Sygnet.App
             Mic = new GameObject("MicListener", typeof(MicListener)).GetComponent<MicListener>();
             Mic.transform.SetParent(transform);
             Mic.FrameReceived += f => HandleFrame(f, FrameSource.Audio);
+            Mic.FrameReceivedInBackground += HandleFrameInBackground;
             Relay.PlayingChanged += playing => Mic.Suspend(playing);    // telefon nie dekoduje sam siebie
 
             BuildCanvas();
             Home = Add(new HomeScreen(this, canvasRoot));
             Scan = Add(new ScanScreen(this, canvasRoot));
             Result = Add(new ResultScreen(this, canvasRoot));
+            Inbox = Add(new InboxScreen(this, canvasRoot));
+            About = Add(new AboutScreen(this, canvasRoot));
+            Area = Add(new AreaScreen(this, canvasRoot));
+            Onboarding = Add(new OnboardingScreen(this, canvasRoot));
+            DebugPanel = Add(new DebugScreen(this, canvasRoot));
             BuildToast();
-            Show(Home);
-            Mic.StartListening();
+            if (Store.Onboarded)
+            {
+                Show(Home);
+                Mic.StartListening();
+            }
+            else
+            {
+                Show(Onboarding);                                   // mikrofon dopiero po onboardingu
+            }
         }
 
         void LoadTrustStore()
@@ -124,31 +153,67 @@ namespace Sygnet.App
             return true;
         }
 
-        /// <summary>Jedyna ścieżka odbioru ramki (QR i dźwięk). PROTOCOL.md §7.</summary>
+        /// <summary>Jedyna ścieżka odbioru ramki (QR i dźwięk) na ekranie. PROTOCOL.md §7.</summary>
         public VerificationResult HandleFrame(byte[] frame, FrameSource source)
         {
-            long now = Now;
-            var r = Verifier.Verify(frame, Trust, now, Store.UserArea, Store.Revoked, Store.Seen);
-            Debug.Log("[SYGNET] " + source + ": " + r + " " + Bytes.ToHex(frame));
-
-            switch (r.Status)
+            var r = Receive(frame, source, out var entry);
+            if (entry == null)
             {
-                case VerifyStatus.Malformed:
-                    return r;                                     // ignoruj po cichu
-                case VerifyStatus.Duplicate:
-                    if (source == FrameSource.Qr) ShowDuplicate(r);   // z dźwięku: bez alarmu
-                    return r;
+                // MALFORMED: ignoruj po cichu; DUPLICATE z dźwięku: bez alarmu
+                if (r.Status == VerifyStatus.Duplicate && source == FrameSource.Qr) ShowDuplicate(r);
+                return r;
             }
-
-            bool revokedChanged = Verifier.Commit(r, Store.Revoked, Store.Seen);
-            if (revokedChanged) Debug.LogWarning("[SYGNET] Unieważniono klucz wydawcy " + Verifier.RevokedIssuerId(r.Payload));
-            var entry = Store.AddToInbox(r, source == FrameSource.Qr ? "qr" : "audio", now);
-            Store.Save();
-
             Alarm(r);
-            Result.Show(r, entry.receivedAt, duplicate: false);
+            Result.ReturnTo = Home;
+            Result.Show(r, entry.receivedAt, null);
             Show(Result);
             return r;
+        }
+
+        /// <summary>
+        /// Ramka z dźwięku, gdy aplikacja jest w tle (wątek nasłuchu): ta sama weryfikacja, wynik jako powiadomienie.
+        /// MALFORMED i DUPLICATE (np. powtórka w telewizji) – bez powiadomienia.
+        /// </summary>
+        void HandleFrameInBackground(byte[] frame)
+        {
+            var r = Receive(frame, FrameSource.Audio, out var entry);
+            if (entry == null) return;
+            pendingFromBackground = entry;
+            AlertNotification.Post(r, Trust, System.Threading.Interlocked.Increment(ref notificationId));
+        }
+
+        /// <summary>Verify → Commit → skrzynka. Zwraca wpis skrzynki albo null (MALFORMED, DUPLICATE).</summary>
+        VerificationResult Receive(byte[] frame, FrameSource source, out InboxEntry entry)
+        {
+            lock (storeLock)
+            {
+                long now = Now;
+                var r = Verifier.Verify(frame, Trust, now, Store.UserArea, Store.Revoked, Store.Seen);
+                Debug.Log("[SYGNET] " + source + ": " + r + " " + Bytes.ToHex(frame));
+                LastFrame = frame;
+                LastSource = source;
+                LastResult = r;
+                LastAt = DateTime.Now;
+                entry = null;
+                if (r.Status == VerifyStatus.Malformed || r.Status == VerifyStatus.Duplicate) return r;
+
+                bool revokedChanged = Verifier.Commit(r, Store.Revoked, Store.Seen);
+                if (revokedChanged) Debug.LogWarning("[SYGNET] Unieważniono klucz wydawcy " + Verifier.RevokedIssuerId(r.Payload));
+                entry = Store.AddToInbox(r, source == FrameSource.Qr ? "qr" : "audio", now);
+                Store.Save();
+                return r;
+            }
+        }
+
+        /// <summary>Powrót z tła: pokaż ostatni komunikat odebrany w tle (np. po dotknięciu powiadomienia).</summary>
+        void OnApplicationPause(bool paused)
+        {
+            if (paused) return;
+            var e = pendingFromBackground;
+            pendingFromBackground = null;
+            if (e == null || current == Onboarding) return;
+            OpenInboxEntry(e);
+            Home.Refresh();
         }
 
         /// <summary>Komunikat już otrzymany: pokaż istniejący wpis, bez alarmu.</summary>
@@ -157,14 +222,17 @@ namespace Sygnet.App
             var entry = Store.FindAuthentic(dup.Payload.IssuerId, dup.Payload.Sequence);
             var frame = entry != null ? Bytes.FromHex(entry.frameHex) : dup.RawFrame;
             var r = Verifier.Verify(frame, Trust, Now, Store.UserArea, Store.Revoked, null);
-            Result.Show(r, entry?.receivedAt ?? Now, duplicate: true);
+            Result.ReturnTo = Home;
+            Result.Show(r, entry?.receivedAt ?? Now, "Ten komunikat jest już w skrzynce");
             Show(Result);
         }
 
-        public void OpenInboxEntry(InboxEntry e)
+        /// <summary>Wpis skrzynki: ponowna weryfikacja na bieżący czas (np. teraz już NIEAKTUALNY).</summary>
+        public void OpenInboxEntry(InboxEntry e, AppScreen returnTo = null)
         {
             var r = Verifier.Verify(Bytes.FromHex(e.frameHex), Trust, Now, Store.UserArea, Store.Revoked, null);
-            Result.Show(r, e.receivedAt, duplicate: true);
+            Result.ReturnTo = returnTo ?? Home;
+            Result.Show(r, e.receivedAt, null);
             Show(Result);
         }
 
@@ -243,8 +311,7 @@ namespace Sygnet.App
             }
             if (toast.gameObject.activeSelf && Time.unscaledTime > toastUntil) toast.gameObject.SetActive(false);
 
-            var kb = Keyboard.current;
-            if (kb != null && kb.escapeKey.wasPressedThisFrame && current != null && !current.OnBack() && current != Home)
+            if (BackPressed() && current != null && !current.OnBack() && current != Home && current != Onboarding)
                 Show(Home);
 
             foreach (var s in screens)
@@ -253,6 +320,17 @@ namespace Sygnet.App
                 s.AnimateEnter(Time.unscaledDeltaTime);
                 s.Tick();
             }
+        }
+
+        /// <summary>
+        /// Przycisk „wstecz” Androida. Input System zgłasza go jako Escape klawiatury, ale przy GameActivity
+        /// nie zawsze na Keyboard.current – sprawdzamy więc każdą klawiaturę.
+        /// </summary>
+        static bool BackPressed()
+        {
+            foreach (var d in InputSystem.devices)
+                if (d is Keyboard k && k.escapeKey.wasPressedThisFrame) return true;
+            return false;
         }
 
         static void ApplySafeArea(RectTransform rt, Rect sa)

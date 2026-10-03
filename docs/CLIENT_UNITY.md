@@ -61,7 +61,8 @@ Assets/
 │   ├── App/                          ← asmdef: Sygnet.App (Unity)
 │   │   ├── RootKey.cs                ← WBUDOWANY klucz publiczny ROOT (pinning)
 │   │   ├── SygnetApp.cs              ← bootstrap, stan, nawigacja ekranów
-│   │   ├── MicListener.cs            ← Microphone → StreamingDecoder
+│   │   ├── MicListener.cs            ← mikrofon → StreamingDecoder (Android: usługa w tle + wątek nasłuchu)
+│   │   ├── AlertNotification.cs      ← powiadomienie o wyniku weryfikacji odebranej w tle
 │   │   ├── QrScanner.cs              ← WebCamTexture + ZXing
 │   │   ├── RelayPlayer.cs            ← ModemEncoder → AudioClip → AudioSource
 │   │   ├── Storage.cs                ← inbox, seen, revoked, user_area (JSON w persistentDataPath)
@@ -72,6 +73,7 @@ Assets/
 ├── Resources/
 │   └── sygnet_trust_store.json       ← z konsoli (php artisan sygnet:init)
 ├── StreamingAssets/testvectors/      ← *.wav do testów na urządzeniu (panel debug)
+├── Plugins/Android/SygnetListen.androidlib/   ← SygnetListenService.java: nasłuch w tle, powiadomienia
 └── link.xml
 ```
 
@@ -135,6 +137,29 @@ Na start, zanim konsola będzie gotowa, użyj ROOT z wektorów testowych (`root_
 - **Podczas „Przekaż dalej” wstrzymaj nasłuch**, żeby telefon nie dekodował sam siebie.
 - Wskaźnik poziomu sygnału (RMS) i „widmo” z 32 mocy Goertzela dają ładną animację na ekranie nasłuchu.
 
+#### Nasłuch w tle (Android)
+
+Scenariusz: telewizor nadaje komunikat, na końcu sygnał SYGNET; telefon leży w kieszeni z wygaszonym ekranem
+albo jest w nim otwarta inna aplikacja – i i tak pokazuje powiadomienie, czy komunikat jest prawdziwy.
+
+- `SygnetListenService` (Java, `Plugins/Android/SygnetListen.androidlib`) to usługa pierwszoplanowa typu `microphone`
+  ze stałym powiadomieniem „SYGNET nasłuchuje komunikatów”. `AudioRecord` 48 kHz mono, źródło `UNPROCESSED`
+  (jeśli telefon je ma; bez AGC i tłumienia szumów, które psują tony), inaczej `VOICE_RECOGNITION`; partial wakelock;
+  bufor kołowy 4 s. Usługa tylko nagrywa, nic nie dekoduje i nic nie wysyła (aplikacja nadal nie ma `INTERNET`).
+- Usługę startujemy, gdy aplikacja jest na ekranie (Android 14+ nie pozwala uruchomić mikrofonu z tła), potem działa dalej.
+  Ten sam tor służy na pierwszym planie, więc nie ma przełączania mikrofonu przy wyjściu z aplikacji.
+- W C# osobny wątek (`AndroidJNI.AttachCurrentThread`) co ok. 40 ms woła `drain()` i karmi `StreamingDecoder`
+  – pętla Unity w tle stoi, ale wątki C# działają. Ramka na pierwszym planie idzie kolejką do wątku głównego
+  (ekran wyniku jak dotąd), w tle od razu do `SygnetApp.HandleFrameInBackground`: ta sama weryfikacja
+  (Verify → Commit → skrzynka, pod blokadą) i `AlertNotification.Post` → `SygnetListenService.notifyResult`.
+- Powiadomienie (kanał „Komunikaty SYGNET”, wysoka ważność, wibracja, widoczne na ekranie blokady):
+  `✅ ZWERYFIKOWANO · typ` z dopiskiem, nadawcą, obszarem i „Co robić”; `ℹ️ INNY OBSZAR`; `⚠️ NIEAKTUALNY`;
+  `⛔ NIEPEŁNY PODPIS`; `⛔ FAŁSZYWKA · podaje się za: typ` z powodem (bez treści atakującego).
+  DUPLICATE (np. powtórka w TV) i MALFORMED – bez powiadomienia. Dotknięcie otwiera aplikację na ekranie tego wyniku.
+- Uprawnienia: `RECORD_AUDIO` i `POST_NOTIFICATIONS` (pytamy razem po onboardingu), `FOREGROUND_SERVICE(_MICROPHONE)`,
+  `WAKE_LOCK`. Koszt: ok. 6% jednego rdzenia przy wygaszonym ekranie (Pixel).
+- W edytorze zostaje `Microphone` Unity, tylko gdy aplikacja jest aktywna.
+
 ### 4.3 QR
 
 - `WebCamTexture` (tylna kamera), co ~200 ms `BarcodeReader.Decode(pixels, w, h)` z `PossibleFormats = QR_CODE`.
@@ -142,7 +167,7 @@ Na start, zanim konsola będzie gotowa, użyj ROOT z wektorów testowych (`root_
 
 ### 4.4 Przekaż dalej
 
-`ModemEncoder.Encode(rawFrame, AudioSettings.outputSampleRate, repeat: 1)`, potem `AudioClip.Create`, `SetData`, `AudioSource.Play`. Przekazujemy **oryginalne bajty** (podpis zostaje nienaruszony). Przycisk dostępny tylko dla VERIFIED / VERIFIED_OTHER_AREA.
+`ModemEncoder.Encode(rawFrame, AudioSettings.outputSampleRate, repeat: 2)`, potem `AudioClip.Create`, `SetData`, `AudioSource.Play`. Dwa powtórzenia (ok. 14 s zamiast 7 s): głośnik telefonu potrafi przekłamać pojedyncze symbole, a odbiornik łączy powtórzenia (sumuje moce tonów kopii, które osobno nie przeszły CRC – zmiana tylko po stronie odbiornika, protokół bez zmian). Przekazujemy **oryginalne bajty** (podpis zostaje nienaruszony). Przycisk dostępny tylko dla VERIFIED / VERIFIED_OTHER_AREA.
 
 ### 4.5 Stan (Storage)
 

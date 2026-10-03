@@ -29,6 +29,11 @@ namespace Sygnet.Core
         public event Action<float[]> FrameFailed;
         public int FramesFailed { get; private set; }
 
+        /// <summary>Ramki uratowane łączeniem powtórzeń (żadna kopia osobno nie przeszła CRC).</summary>
+        public int FramesCombined { get; private set; }
+
+        readonly RepetitionCombiner combiner;
+
         // ── bufor próbek: buf[0] to próbka o numerze bufStart od początku nasłuchu ──
         readonly float[] buf;
         long bufStart;
@@ -71,6 +76,7 @@ namespace Sygnet.Core
         public StreamingDecoder(int sampleRate)
         {
             Decoder = new ModemDecoder(sampleRate);
+            combiner = new RepetitionCombiner((long)(DedupSeconds * sampleRate));
             buf = new float[(int)(BufferSeconds * sampleRate)];
             scanWindows = (int)(ScanSeconds * sampleRate / Decoder.DetHop);
             minGapWindows = (int)(MinPreambleGapSeconds * sampleRate / Decoder.DetHop);
@@ -249,10 +255,18 @@ namespace Sygnet.Core
                 }
 
                 jobs.RemoveAt(i);
-                var frame = Decoder.DecodeFrom(buf, bufLen, (int)(j.Start - bufStart), j.FrameLen);
-                if (frame != null)
+                int symbols = 4 + j.FrameLen;
+                var powers = Decoder.FramePowers(buf, bufLen, (int)(j.Start - bufStart), symbols);
+                var frame = powers == null ? null : ModemDecoder.Decide(powers, symbols);
+                if (ModemDecoder.CrcOk(frame))
                 {
                     Emit(frame, j.Start);
+                }
+                else if (powers != null && (frame = combiner.AddFailed(powers, symbols, j.Start)) != null)
+                {
+                    FramesFailed++;
+                    FramesCombined++;
+                    Emit(frame, j.Start);                               // uratowana z sumy powtórzeń
                 }
                 else
                 {

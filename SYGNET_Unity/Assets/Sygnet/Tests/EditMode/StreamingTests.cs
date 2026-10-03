@@ -171,6 +171,27 @@ namespace Sygnet.Tests
             Assert.Greater(dump.Length, x.Length * 0.9, "nagranie obejmuje całą ramkę z preambułą");
         }
 
+        [Test]
+        public void Combining_SecondRepetitionRescuesFrame()
+        {
+            const int sr = 24000;
+            var once = ModemEncoder.Encode(TV1, sr, 1);
+            int dataStart = ModemConstants.Samples(sr, 500), period = ModemConstants.Samples(sr, 50);
+            float[] Corrupt(int index)
+            {
+                var c = (float[])once.Clone();
+                var other = ModemEncoder.Encode(new[] { (byte)(TV1[index] ^ 0x5A) }, sr, 1);
+                Array.Copy(other, dataStart, c, dataStart + index * period, period);
+                return c;
+            }
+            var x = Corrupt(25).Concat(Silence(sr, 0.5)).Concat(Corrupt(90)).Concat(Silence(sr, 0.5)).ToArray();
+            var d = new StreamingDecoder(sr);
+            var got = Feed(d, x);
+            Assert.AreEqual(1, got.Count);
+            CollectionAssert.AreEqual(TV1, got[0]);
+            Assert.AreEqual(1, d.FramesCombined);
+        }
+
         /// <summary>Głośnik laptopa → pokój → mikrofon telefonu: 44,1 kHz, pogłos, dryf zegara, szum 10 dB, porcje.</summary>
         [Test]
         public void Noisy_Echo_Drift_InChunks()

@@ -11,6 +11,8 @@ Unity (SYGNET_Unity/Assets):
   Sygnet/Art/icon_foreground.png   znak w strefie bezpiecznej (Ø 66/108), przezroczyste tło
   Sygnet/Art/icon_legacy.png       tło + znak (ikona zwykła i okrągła)
   Resources/sygnet_logo.png        biały znak do UI aplikacji
+  Plugins/Android/SygnetListen.androidlib/src/main/res/drawable-*/sygnet_notify.png
+                                   ikona powiadomień (24 dp, biały znak na przezroczystym)
 docs/brand/ (konsola, prezentacja, plakaty):
   sygnet_mark_white.png / sygnet_mark_black.png        sam znak, przezroczyste tło
   sygnet_lockup_dark.png                               znak + napis na ciemnym tle
@@ -117,6 +119,12 @@ def main():
     colorize(fit(m, 1024, radius=0.28), WHITE).save(os.path.join(art, "icon_foreground.png"))
     colorize(fit(m, 1024, radius=0.37), WHITE, BG).convert("RGB").save(os.path.join(art, "icon_legacy.png"))
     colorize(fit(m, 512, height=0.96), WHITE).save(os.path.join(UNITY, "Resources", "sygnet_logo.png"))
+    # ikona na pasku powiadomień: 24 dp, Android bierze tylko kanał alfa
+    res = os.path.join(UNITY, "Plugins", "Android", "SygnetListen.androidlib", "src", "main", "res")
+    for dpi, px in (("xhdpi", 48), ("xxhdpi", 72), ("xxxhdpi", 96)):
+        d = os.path.join(res, "drawable-" + dpi)
+        os.makedirs(d, exist_ok=True)
+        colorize(fit(m, px, height=20 / 24), (255, 255, 255)).save(os.path.join(d, "sygnet_notify.png"))
 
     colorize(fit(m, 1024, height=0.9), WHITE).save(os.path.join(BRAND, "sygnet_mark_white.png"))
     colorize(fit(m, 1024, height=0.9), BLACK).save(os.path.join(BRAND, "sygnet_mark_black.png"))

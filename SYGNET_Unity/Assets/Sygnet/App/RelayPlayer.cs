@@ -5,7 +5,8 @@ using UnityEngine;
 namespace Sygnet.App
 {
     /// <summary>
-    /// „Przekaż dalej” (CLIENT_UNITY.md §4.4): odtwarza dźwiękiem ORYGINALNE bajty ramki, więc podpis zostaje
+    /// „Przekaż dalej” (CLIENT_UNITY.md §4.4): odtwarza dźwiękiem ORYGINALNE bajty ramki (2 powtórzenia – odbiornik
+    /// może je połączyć, gdy głośnik telefonu zniekształca pojedyncze symbole), więc podpis zostaje
     /// nienaruszony i telefon sąsiada weryfikuje go sam.
     /// </summary>
     [RequireComponent(typeof(AudioSource))]
@@ -29,7 +30,7 @@ namespace Sygnet.App
             source.volume = 1;
         }
 
-        public float Play(byte[] frame, int repeat = 1)
+        public float Play(byte[] frame, int repeat = ModemConstants.DefaultRepeat)
         {
             int sr = AudioSettings.outputSampleRate;
             var samples = ModemEncoder.Encode(frame, sr, repeat);

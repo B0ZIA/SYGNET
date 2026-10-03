@@ -192,24 +192,26 @@ namespace Sygnet.Editor
 
         List<Scenario> BuildScenarios()
         {
+            // Odbiorca na demo: Kraków (HackYeah). W testowym zestawie kluczy Kraków obejmuje tylko Dowództwo Operacyjne (1),
+            // więc ewakuacja z 2 podpisami jest warszawska – krakowską zrobi konsola z prawdziwymi kluczami (wydawcy 4 i 7).
             var list = new List<Scenario>
             {
-                new Scenario { Label = "Alarm lotniczy – Wojewoda Mazowiecki, Warszawa", Expect = "ZWERYFIKOWANO",
-                    Build = (now, seq) => Signed(3, AlertTypes.AirRaid, 1465, now, 60, seq, "Schron: metro Świętokrzyska", (3, "3")) },
-                new Scenario { Label = "Ewakuacja – 2 podpisy (Wojewoda + PSP)", Expect = "ZWERYFIKOWANO",
-                    Build = (now, seq) => Signed(3, AlertTypes.Evacuation, 1465, now, 240, seq, "Kierunek: Grodzisk Maz.", (3, "3"), (5, "5")) },
-                new Scenario { Label = "Ewakuacja – tylko 1 podpis", Expect = "NIEPEŁNY PODPIS",
-                    Build = (now, seq) => Signed(3, AlertTypes.Evacuation, 1465, now, 240, seq, "Kierunek: Grodzisk Maz.", (3, "3")) },
+                new Scenario { Label = "Alarm lotniczy – Dowództwo Operacyjne, Kraków", Expect = "ZWERYFIKOWANO",
+                    Build = (now, seq) => Signed(1, AlertTypes.AirRaid, 1261, now, 60, seq, "Schron: piwnice i przejścia podziemne", (1, "1")) },
+                new Scenario { Label = "Skażenie chemiczne – Dowództwo Operacyjne, woj. małopolskie", Expect = "ZWERYFIKOWANO",
+                    Build = (now, seq) => Signed(1, AlertTypes.Chemical, 12, now, 180, seq, "Zamknij okna i wentylację", (1, "1")) },
+                new Scenario { Label = "Ewakuacja Krakowa – tylko 1 podpis", Expect = "NIEPEŁNY PODPIS",
+                    Build = (now, seq) => Signed(1, AlertTypes.Evacuation, 1261, now, 240, seq, "Kierunek: Wieliczka", (1, "1")) },
                 new Scenario { Label = "ATAK A1: haker podszywa się pod Dowództwo Operacyjne", Expect = "FAŁSZYWKA (podpis nie pasuje)",
                     Build = (now, seq) => Signed(1, AlertTypes.General, 0, now, 120, seq, "Mobilizacja 200 tys. rezerwistów", (1, "hacker")) },
-                new Scenario { Label = "ATAK: Prezydent Warszawy wydaje dla Krakowa", Expect = "FAŁSZYWKA (brak uprawnień)",
-                    Build = (now, seq) => Signed(6, AlertTypes.AirRaid, 1261, now, 60, seq, "", (6, "6")) },
-                new Scenario { Label = "ATAK A3: prawdziwy, ale sprzed 3 dni (powtórka)", Expect = "NIEAKTUALNY",
-                    Build = (now, seq) => Signed(1, AlertTypes.AirRaid, 1465, now - 3 * 86400, 120, seq, "Schron: metro Świętokrzyska", (1, "1")) },
-                new Scenario { Label = "Komunikat dla Krakowa (Dowództwo Operacyjne)", Expect = "INNY OBSZAR (dla użytkownika z Warszawy)",
-                    Build = (now, seq) => Signed(1, AlertTypes.WaterContamination, 1261, now, 600, seq, "Nie pij wody z kranu", (1, "1")) },
-                new Scenario { Label = "Skażenie chemiczne – PSP Mazowsze, woj. mazowieckie", Expect = "ZWERYFIKOWANO",
-                    Build = (now, seq) => Signed(5, AlertTypes.Chemical, 14, now, 180, seq, "Pożar zakładu w Płocku", (5, "5")) },
+                new Scenario { Label = "ATAK A4: Prezydent Warszawy wydaje dla Krakowa", Expect = "FAŁSZYWKA (brak uprawnień)",
+                    Build = (now, seq) => Signed(6, AlertTypes.AirRaid, 1261, now, 60, seq, "Natychmiast do schronu", (6, "6")) },
+                new Scenario { Label = "ATAK A3: prawdziwy alarm dla Krakowa sprzed 3 dni", Expect = "NIEAKTUALNY",
+                    Build = (now, seq) => Signed(1, AlertTypes.AirRaid, 1261, now - 3 * 86400, 120, seq, "Schron: piwnice i przejścia podziemne", (1, "1")) },
+                new Scenario { Label = "Komunikat dla Warszawy (Dowództwo Operacyjne)", Expect = "INNY OBSZAR (dla użytkownika z Krakowa)",
+                    Build = (now, seq) => Signed(1, AlertTypes.WaterContamination, 1465, now, 600, seq, "Nie pij wody z kranu", (1, "1")) },
+                new Scenario { Label = "Ewakuacja Warszawy – 2 podpisy (Wojewoda + PSP)", Expect = "INNY OBSZAR (Kraków) / ZWERYFIKOWANO (Warszawa)",
+                    Build = (now, seq) => Signed(3, AlertTypes.Evacuation, 1465, now, 240, seq, "Kierunek: Grodzisk Maz.", (3, "3"), (5, "5")) },
                 new Scenario { Label = "ROOT unieważnia klucz Prezydenta Warszawy (6)", Expect = "ZWERYFIKOWANO, potem klucz 6 odrzucany",
                     // dopisek KEY_REVOKE = u16 ID odwoływanego wydawcy (PROTOCOL.md §2)
                     Build = (now, seq) => SignedRaw(0, AlertTypes.KeyRevoke, 0, now, 60 * 24 * 365, seq, new byte[] { 0, 6 }, (0, "0")) },
@@ -221,7 +223,7 @@ namespace Sygnet.Editor
                 var hex = (string)v["frame_hex"];
                 list.Add(new Scenario
                 {
-                    Label = "Wektor " + kv.Key + " (włącz zegar testowy: 5× logo)",
+                    Label = "Wektor " + kv.Key + " (zegar testowy w panelu diagnostycznym, obszar Warszawa)",
                     Expect = (string)v["expected_status"] + " " + v["reason"],
                     Build = (now, seq) => Bytes.FromHex(hex),
                 });

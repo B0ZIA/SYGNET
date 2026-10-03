@@ -31,7 +31,7 @@ namespace Sygnet.App.UI
 
         public HomeScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Home", Theme.Bg)
         {
-            // ── nagłówek: sygnet + napis (5× tap = zegar testowy), obszar ──
+            // ── nagłówek: sygnet + napis (5× tap = panel diagnostyczny), obszar ──
             var header = Ui.Rect(Safe, "Header");
             Ui.Top(header, 40, 104, Theme.Margin);
             var brand = Ui.Rect(header, "Brand");
@@ -44,6 +44,7 @@ namespace Sygnet.App.UI
 
             var (areaChip, areaText) = Ui.Chip(header, Icons.Pin, "", Theme.Surface2, Theme.Text, TextStyle.BodyStrong, 88);
             Ui.Pin(areaChip.rectTransform, new Vector2(1, 0.5f), new Vector2(0, 88));
+            Ui.HitArea(areaChip.rectTransform, () => App.Show(App.Area));
             areaLabel = areaText;
 
             // ── stan zaufania: offline + odcisk ROOT ──
@@ -51,8 +52,10 @@ namespace Sygnet.App.UI
             Ui.Top(chips, 172, 72, Theme.Margin);
             Ui.HStack(chips, 16, TextAnchor.MiddleLeft);
             Ui.Chip(chips, Icons.Plane, "Offline", Theme.Surface, Theme.Muted, TextStyle.Caption, 72);
-            Ui.Chip(chips, Icons.Key, "ROOT " + App.Trust.RootFingerprint.Substring(0, 9) + (SygnetApp.RootIsTestKey ? " · test" : ""),
+            var (rootChip, _) = Ui.Chip(chips, Icons.Key,
+                "ROOT " + App.Trust.RootFingerprint.Substring(0, 9) + (SygnetApp.RootIsTestKey ? " · test" : ""),
                 Theme.Surface, Theme.Muted, TextStyle.Mono, 72);
+            Ui.HitArea(rootChip.rectTransform, () => App.Show(App.About));
 
             var (cc, ct) = Ui.Chip(Safe, null, "", Theme.Expired, Color.white, TextStyle.Overline, 64);
             clockChip = cc.rectTransform;
@@ -103,7 +106,7 @@ namespace Sygnet.App.UI
             // ── akcje ──
             var scan = Ui.Button(Safe, "Skanuj kod QR", ButtonKind.Primary, () => App.Show(App.Scan), Icons.Qr);
             Ui.Bottom((RectTransform)scan.transform, 210, Theme.ButtonHeight, Theme.Margin);
-            lastButton = Ui.Button(Safe, "Ostatni komunikat", ButtonKind.Secondary, OpenLast, Icons.Inbox, 136);
+            lastButton = Ui.Button(Safe, "Skrzynka", ButtonKind.Secondary, () => App.Show(App.Inbox), Icons.Inbox, 136);
             Ui.Bottom((RectTransform)lastButton.transform, 48, 136, Theme.Margin);
         }
 
@@ -114,6 +117,7 @@ namespace Sygnet.App.UI
             areaLabel.text = Areas.Name(App.Store.UserArea);
             clockChip.gameObject.SetActive(App.TestClock);
             lastButton.gameObject.SetActive(App.Store.Inbox.Count > 0);
+            Ui.SetLabel(lastButton, "Skrzynka · " + App.Store.Inbox.Count);
             UpdateClock();
         }
 
@@ -168,7 +172,9 @@ namespace Sygnet.App.UI
                     break;
                 case MicListener.State.Listening:
                     status.text = "Nasłuchuję komunikatów";
-                    hint.text = "Radio, megafon albo telefon sąsiada.\nMożesz też zeskanować kod QR.";
+                    hint.text = mic.Background
+                        ? "Radio, telewizja, telefon sąsiada – także w tle.\nMożesz też zeskanować kod QR."
+                        : "Radio, megafon albo telefon sąsiada.\nMożesz też zeskanować kod QR.";
                     break;
                 case MicListener.State.Paused:
                     status.text = "Nadaję dźwiękiem…";
@@ -209,13 +215,8 @@ namespace Sygnet.App.UI
             if (++logoTaps >= 5)
             {
                 logoTaps = 0;
-                App.ToggleTestClock();
+                App.Show(App.DebugPanel);                           // ukryty panel diagnostyczny (CLIENT_UNITY.md §5.6)
             }
-        }
-
-        void OpenLast()
-        {
-            if (App.Store.Inbox.Count > 0) App.OpenInboxEntry(App.Store.Inbox[0]);
         }
     }
 }

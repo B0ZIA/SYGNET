@@ -22,23 +22,27 @@ namespace Sygnet.App.UI
         readonly Button relayButton;
         VerificationResult current;
 
+        /// <summary>Dokąd wraca „OK” i przycisk wstecz (ekran główny albo skrzynka).</summary>
+        public AppScreen ReturnTo;
+
         public ResultScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Result", Theme.Verified)
         {
             body = Ui.Rect(Safe, "Body");
             content = Ui.Scroll(body, "Scroll", 28, new RectOffset(56, 56, 40, 48));
 
-            var ok = Ui.Button(Safe, "OK", ButtonKind.Primary, () => App.Show(App.Home));
+            var ok = Ui.Button(Safe, "OK", ButtonKind.Primary, () => App.Show(ReturnTo ?? App.Home));
             Ui.Bottom((RectTransform)ok.transform, 40, Theme.ButtonHeight, Theme.Margin);
             relayButton = Ui.Button(Safe, "Przekaż dalej", ButtonKind.OnColor, Relay, Icons.Speaker);
             Ui.Bottom((RectTransform)relayButton.transform, 40 + Theme.ButtonHeight + 24, Theme.ButtonHeight, Theme.Margin);
         }
 
-        public void Show(VerificationResult r, long receivedAt, bool duplicate)
+        /// <summary><paramref name="notice"/>: opcjonalna informacja nad treścią (np. „już w skrzynce”).</summary>
+        public void Show(VerificationResult r, long receivedAt, string notice)
         {
             current = r;
             Background.color = Theme.ForStatus(r.Status);
             for (int i = content.childCount - 1; i >= 0; i--) Object.Destroy(content.GetChild(i).gameObject);
-            Build(r, receivedAt, duplicate);
+            Build(r, receivedAt, notice);
             relayButton.gameObject.SetActive(r.IsAuthentic);                // przekazujemy tylko prawdziwe
             int buttons = r.IsAuthentic ? 2 : 1;
             Ui.Stretch(body, 0, 0, 0, 40 + buttons * Theme.ButtonHeight + (buttons - 1) * 24 + 24);
@@ -47,7 +51,7 @@ namespace Sygnet.App.UI
 
         public override bool OnBack()
         {
-            App.Show(App.Home);
+            App.Show(ReturnTo ?? App.Home);
             return true;
         }
 
@@ -70,7 +74,7 @@ namespace Sygnet.App.UI
 
         // ───────────── treść ─────────────
 
-        void Build(VerificationResult r, long receivedAt, bool duplicate)
+        void Build(VerificationResult r, long receivedAt, string notice)
         {
             var p = r.Payload;
             var type = AlertTypes.Get(p.Type);
@@ -99,10 +103,10 @@ namespace Sygnet.App.UI
             var line = Ui.Label(head, StatusLine(r, p), TextStyle.Body, On, TextAlignmentOptions.Center);
             Ui.Layout(line, -1, -1, 968);
 
-            if (duplicate)
+            if (notice != null)
             {
                 var c = Card(new Color(1, 1, 1, 0.16f), 22);
-                Ui.Label(c, "Ten komunikat jest już w skrzynce", TextStyle.BodyStrong, On, TextAlignmentOptions.Center);
+                Ui.Label(c, notice, TextStyle.BodyStrong, On, TextAlignmentOptions.Center);
             }
 
             // powód odrzucenia – najważniejsze przy fałszywce

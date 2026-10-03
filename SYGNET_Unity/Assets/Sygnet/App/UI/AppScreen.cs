@@ -31,11 +31,14 @@ namespace Sygnet.App.UI
 
         public bool Visible => Root.gameObject.activeSelf;
 
+        /// <summary>Bez animacji wejścia (zrzuty ekranu z edytora bez fokusu, gdzie pętla gry stoi).</summary>
+        public static bool SkipAnimations;
+
         /// <summary>Start animacji wejścia – woła SygnetApp.Show.</summary>
         public void BeginEnter()
         {
-            shown = 0;
-            Animate(0);
+            shown = SkipAnimations ? 1 : 0;
+            Animate(shown);
         }
 
         /// <summary>Krok animacji wejścia (ease-out).</summary>

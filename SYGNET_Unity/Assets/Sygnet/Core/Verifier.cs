@@ -143,6 +143,14 @@ namespace Sygnet.Core
             }
         }
 
+        /// <summary>Odwrotność <see cref="StatusName"/> (np. status zapisany w skrzynce); nieznany → Malformed.</summary>
+        public static VerifyStatus ParseStatus(string name)
+        {
+            foreach (VerifyStatus s in Enum.GetValues(typeof(VerifyStatus)))
+                if (StatusName(s) == name) return s;
+            return VerifyStatus.Malformed;
+        }
+
         static VerificationResult Done(VerificationResult r, VerifyStatus status, string reason)
         {
             r.Status = status;

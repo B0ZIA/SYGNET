@@ -50,9 +50,17 @@ namespace Sygnet.Core
         public List<byte[]> DecodeAll(float[] x, int length)
         {
             var output = new List<byte[]>();
+            var combiner = new RepetitionCombiner(long.MaxValue);   // kopie, które osobno nie przeszły CRC
             foreach (var t0 in FindPreambles(x, length))
             {
-                var f = DecodeAt(x, length, t0);
+                int t = RefineStart(x, length, t0);
+                if (t < 0) continue;
+                int flen = ReadFrameLen(x, length, t);
+                if (flen < 0) continue;
+                var powers = FramePowers(x, length, t, 4 + flen);
+                if (powers == null) continue;
+                var f = Decide(powers, 4 + flen);
+                if (!CrcOk(f)) f = combiner.AddFailed(powers, 4 + flen, t);
                 if (f == null) continue;
                 bool dup = false;
                 foreach (var o in output)
@@ -210,14 +218,56 @@ namespace Sygnet.Core
         /// <summary>Dekoduje 4 + frame_len symboli od dostrojonego <paramref name="t"/> i sprawdza CRC; null przy błędzie.</summary>
         public byte[] DecodeFrom(float[] x, int length, int t, int flen)
         {
-            var frame = new byte[4 + flen];
-            for (int k = 0; k < frame.Length; k++)
+            var powers = FramePowers(x, length, t, 4 + flen);
+            if (powers == null) return null;
+            var frame = Decide(powers, 4 + flen);
+            return CrcOk(frame) ? frame : null;
+        }
+
+        /// <summary>Liczba mocy na symbol: 16 tonów pasma A + 16 tonów pasma B.</summary>
+        public const int PowersPerSymbol = 32;
+
+        /// <summary>
+        /// Znormalizowane moce wszystkich 32 tonów dla <paramref name="symbols"/> kolejnych symboli od dostrojonego t
+        /// (do łączenia powtórzeń). null, gdy okno analizy wychodzi poza bufor.
+        /// </summary>
+        public double[] FramePowers(float[] x, int length, int t, int symbols)
+        {
+            var p = new double[symbols * PowersPerSymbol];
+            for (int k = 0; k < symbols; k++)
             {
-                if (!TrySymbol(x, length, t + k * SymbolPeriod, out frame[k], out _)) return null;
+                int a0 = t + k * SymbolPeriod + analyzeFrom;
+                if (a0 < 0 || t + k * SymbolPeriod + analyzeTo > length) return null;
+                bankA.Powers(x, a0, powA);
+                bankB.Powers(x, a0, powB);
+                Array.Copy(powA, 0, p, k * PowersPerSymbol, 16);
+                Array.Copy(powB, 0, p, k * PowersPerSymbol + 16, 16);
             }
-            if (frame.Length < 6) return null;
+            return p;
+        }
+
+        /// <summary>Bajty z mocy: w każdym paśmie ton o największej mocy (górne / dolne 4 bity).</summary>
+        public static byte[] Decide(double[] powers, int symbols)
+        {
+            var frame = new byte[symbols];
+            for (int k = 0; k < symbols; k++)
+            {
+                int o = k * PowersPerSymbol, ia = 0, ib = 0;
+                for (int i = 1; i < 16; i++)
+                {
+                    if (powers[o + i] > powers[o + ia]) ia = i;
+                    if (powers[o + 16 + i] > powers[o + 16 + ib]) ib = i;
+                }
+                frame[k] = (byte)((ia << 4) | ib);
+            }
+            return frame;
+        }
+
+        public static bool CrcOk(byte[] frame)
+        {
+            if (frame == null || frame.Length < 6) return false;
             int crcPos = frame.Length - 2;
-            return Crc16.Compute(frame, 0, crcPos) == Bytes.ReadU16(frame, crcPos) ? frame : null;
+            return Crc16.Compute(frame, 0, crcPos) == Bytes.ReadU16(frame, crcPos);
         }
 
         static int ArgMax(double[] a)

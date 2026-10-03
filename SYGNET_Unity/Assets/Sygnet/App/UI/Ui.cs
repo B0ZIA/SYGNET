@@ -217,6 +217,7 @@ namespace Sygnet.App.UI
             btn.targetGraphic = img;
             var colors = btn.colors;
             colors.pressedColor = new Color(0.78f, 0.78f, 0.78f);
+            colors.highlightedColor = colors.selectedColor = Color.white;   // bez „szarego” stanu po dotknięciu
             colors.disabledColor = new Color(1, 1, 1, 0.45f);
             colors.fadeDuration = 0.08f;
             btn.colors = colors;
@@ -249,6 +250,24 @@ namespace Sygnet.App.UI
             Layout(img, height, height);
             return (img, t);
         }
+
+        public const float HeaderHeight = 128;
+        public const float HeaderTop = 40;
+
+        /// <summary>Nagłówek podekranu: okrągły przycisk „wstecz” + tytuł. Treść zaczyna się od <see cref="BelowHeader"/>.</summary>
+        public static TextMeshProUGUI Header(Transform safe, string title, UnityAction onBack)
+        {
+            var back = Button(safe, "", ButtonKind.Secondary, onBack, Icons.Back, HeaderHeight);
+            Pin((RectTransform)back.transform, new Vector2(0, 1), new Vector2(HeaderHeight, HeaderHeight),
+                new Vector2(Theme.Margin, -HeaderTop));
+            var t = Label(safe, title, TextStyle.Title, Theme.Text, TextAlignmentOptions.MidlineLeft);
+            Top(t.rectTransform, HeaderTop, HeaderHeight, 0);
+            t.rectTransform.offsetMin = new Vector2(Theme.Margin + HeaderHeight + 36, t.rectTransform.offsetMin.y);
+            t.rectTransform.offsetMax = new Vector2(-Theme.Margin, t.rectTransform.offsetMax.y);
+            return t;
+        }
+
+        public const float BelowHeader = HeaderTop + HeaderHeight + 24;
 
         /// <summary>Niewidoczny przycisk na całym prostokącie (np. 5× tap w logo).</summary>
         public static Button HitArea(RectTransform rt, UnityAction onClick)

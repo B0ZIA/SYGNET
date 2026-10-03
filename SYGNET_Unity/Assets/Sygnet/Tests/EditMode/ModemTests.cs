@@ -110,6 +110,46 @@ namespace Sygnet.Tests
             CollectionAssert.IsEmpty(ModemDecoder.Decode(x, sr));
         }
 
+        // ── łączenie powtórzeń (soft combining) ──
+
+        /// <summary>Podmienia symbol nr <paramref name="index"/> na ton innego bajtu (jedna kopia, bez powtórzeń).</summary>
+        static float[] WithWrongSymbol(byte[] frame, int sr, params int[] indices)
+        {
+            var x = ModemEncoder.Encode(frame, sr, 1);
+            int dataStart = ModemConstants.Samples(sr, 2 * (ModemConstants.PreambleToneMs + ModemConstants.PreambleGapMs));
+            int period = ModemConstants.Samples(sr, ModemConstants.SymbolPeriodMs);
+            foreach (var index in indices)
+            {
+                var other = ModemEncoder.Encode(new[] { (byte)(frame[index] ^ 0x5A) }, sr, 1);
+                Array.Copy(other, dataStart, x, dataStart + index * period, period);
+            }
+            return x;
+        }
+
+        [Test]
+        public void Combining_TwoCopiesWithDifferentErrors_Decodes()
+        {
+            const int sr = 24000;
+            var copy1 = WithWrongSymbol(TV1, sr, 30, 31);
+            var copy2 = WithWrongSymbol(TV1, sr, 70);
+            CollectionAssert.IsEmpty(ModemDecoder.Decode(copy1, sr), "kopia 1 osobno ma zły CRC");
+            CollectionAssert.IsEmpty(ModemDecoder.Decode(copy2, sr), "kopia 2 osobno ma zły CRC");
+            var x = copy1.Concat(new float[sr / 2]).Concat(copy2).ToArray();
+            var frames = ModemDecoder.Decode(x, sr);
+            Assert.AreEqual(1, frames.Count);
+            CollectionAssert.AreEqual(TV1, frames[0]);
+        }
+
+        [Test]
+        public void Combining_NeverMixesDifferentFramesOfSameLength()
+        {
+            const int sr = 24000;
+            var tv3 = TestData.Get("TV3_forged_hacker_as_1").Frame;           // ta sama długość co TV1 (118 B)
+            Assert.AreEqual(TV1.Length, tv3.Length);
+            var x = WithWrongSymbol(TV1, sr, 30).Concat(new float[sr / 2]).Concat(WithWrongSymbol(tv3, sr, 70)).ToArray();
+            CollectionAssert.IsEmpty(ModemDecoder.Decode(x, sr));
+        }
+
         // ── macierz selftest z sygnet_ref.py: szum, inny sample rate, przesunięcie, pogłos, dryf zegara ──
 
         static IEnumerable<TestCaseData> SelfTestMatrix()

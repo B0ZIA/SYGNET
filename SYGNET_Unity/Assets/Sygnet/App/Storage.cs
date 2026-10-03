@@ -26,7 +26,7 @@ namespace Sygnet.App
         class Data
         {
             public int version = 1;
-            public int userArea = 1465;
+            public int userArea = 1261;                 // Kraków – miejsce demo (HackYeah)
             public bool onboarded;
             public List<InboxEntry> inbox = new List<InboxEntry>();
             public List<int> seenIssuer = new List<int>();
