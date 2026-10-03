@@ -13,13 +13,19 @@ using ZXing.QrCode.Internal;
 namespace Sygnet.Editor
 {
     /// <summary>
-    /// Nadajnik testowy w edytorze: świeże komunikaty podpisane SEEDAMI TESTOWYMI z testvectors.json albo wektory TV1–TV6,
-    /// pokazane jako QR na ekranie laptopa i zapisywane jako WAV. Zastępuje konsolę, dopóki ta nie jest gotowa.
+    /// Nadajnik testowy w edytorze: świeże komunikaty podpisane kluczami konsoli (backend/storage/app/keys – te same,
+    /// których trust store jest w aplikacji), a gdy konsoli nie ma – seedami testowymi z testvectors.json.
+    /// Do tego wektory TV1–TV6. Pokazuje QR na ekranie laptopa, gra dźwiękiem i zapisuje WAV.
     /// </summary>
     public class TestTransmitterWindow : EditorWindow
     {
         const string VectorsPath = "Assets/Sygnet/Tests/EditMode/Data/testvectors.json";
         const string SeqPref = "Sygnet.TestTransmitter.Seq";
+
+        /// <summary>Seedy konsoli Laravel (base64, poza gitem) – tylko na tym laptopie.</summary>
+        static string ConsoleKeysDir => Path.GetFullPath(Path.Combine(Application.dataPath, "../../backend/storage/app/keys"));
+
+        static bool UseConsoleKeys => File.Exists(Path.Combine(ConsoleKeysDir, "0.seed"));
 
         sealed class Scenario
         {
@@ -69,7 +75,10 @@ namespace Sygnet.Editor
                 EditorGUILayout.HelpBox("Nie wczytano " + VectorsPath, MessageType.Error);
                 return;
             }
-            EditorGUILayout.HelpBox("Klucze TESTOWE z testvectors.json – działa z aplikacją, dopóki ma testowy RootKey.", MessageType.Info);
+            EditorGUILayout.HelpBox(UseConsoleKeys
+                ? "Klucze konsoli (backend/storage/app/keys), ROOT " + Ed25519.Fingerprint(Ed25519.PublicKeyFromSeed(Seed("0"))) +
+                  ". Wektory TV1–TV6 są podpisane kluczami testowymi – aplikacja z prawdziwym ROOT pokaże FAŁSZYWKĘ."
+                : "Klucze TESTOWE z testvectors.json – działa z aplikacją, dopóki ma testowy RootKey.", MessageType.Info);
             selected = EditorGUILayout.Popup("Scenariusz", selected, labels);
             using (new EditorGUILayout.HorizontalScope())
             {
@@ -175,7 +184,15 @@ namespace Sygnet.Editor
 
         // ───────────── scenariusze (jak demo z README §7) ─────────────
 
-        byte[] Seed(string key) => Bytes.FromHex((string)((Dictionary<string, object>)vectors["seeds_hex"])[key]);
+        byte[] Seed(string key)
+        {
+            var path = Path.Combine(ConsoleKeysDir, key + ".seed");
+            if (UseConsoleKeys)
+                return File.Exists(path)
+                    ? Convert.FromBase64String(File.ReadAllText(path).Trim())
+                    : throw new InvalidOperationException("Konsola nie ma klucza " + key);
+            return Bytes.FromHex((string)((Dictionary<string, object>)vectors["seeds_hex"])[key]);
+        }
 
         byte[] Signed(int issuer, int type, int area, long ts, int validMin, int seq, string note, params (int id, string seed)[] signers) =>
             SignedRaw(issuer, type, area, ts, validMin, seq, Encoding.UTF8.GetBytes(note ?? ""), signers);
@@ -192,8 +209,8 @@ namespace Sygnet.Editor
 
         List<Scenario> BuildScenarios()
         {
-            // Odbiorca na demo: Kraków (HackYeah). W testowym zestawie kluczy Kraków obejmuje tylko Dowództwo Operacyjne (1),
-            // więc ewakuacja z 2 podpisami jest warszawska – krakowską zrobi konsola z prawdziwymi kluczami (wydawcy 4 i 7).
+            // Odbiorca na demo: Kraków (HackYeah). Krakowska ewakuacja z 2 podpisami (wydawcy 4 + 7) tylko z kluczami konsoli –
+            // w testowym zestawie Kraków obejmuje wyłącznie Dowództwo Operacyjne (1).
             var list = new List<Scenario>
             {
                 new Scenario { Label = "Alarm lotniczy – Dowództwo Operacyjne, Kraków", Expect = "ZWERYFIKOWANO",
@@ -214,8 +231,15 @@ namespace Sygnet.Editor
                     Build = (now, seq) => Signed(3, AlertTypes.Evacuation, 1465, now, 240, seq, "Kierunek: Grodzisk Maz.", (3, "3"), (5, "5")) },
                 new Scenario { Label = "ROOT unieważnia klucz Prezydenta Warszawy (6)", Expect = "ZWERYFIKOWANO, potem klucz 6 odrzucany",
                     // dopisek KEY_REVOKE = u16 ID odwoływanego wydawcy (PROTOCOL.md §2)
-                    Build = (now, seq) => SignedRaw(0, AlertTypes.KeyRevoke, 0, now, 60 * 24 * 365, seq, new byte[] { 0, 6 }, (0, "0")) },
+                    Build = (now, seq) => SignedRaw(0, AlertTypes.KeyRevoke, 0, now, 0xFFFF, seq, new byte[] { 0, 6 }, (0, "0")) },
             };
+
+            if (UseConsoleKeys)
+                list.Insert(3, new Scenario
+                {
+                    Label = "Ewakuacja Krakowa – 2 podpisy (Wojewoda Małopolski + Prezydent Krakowa)", Expect = "ZWERYFIKOWANO",
+                    Build = (now, seq) => Signed(4, AlertTypes.Evacuation, 1261, now, 240, seq, "Kierunek: Wieliczka", (4, "4"), (7, "7")),
+                });
 
             foreach (var kv in (Dictionary<string, object>)vectors["vectors"])
             {
@@ -223,7 +247,7 @@ namespace Sygnet.Editor
                 var hex = (string)v["frame_hex"];
                 list.Add(new Scenario
                 {
-                    Label = "Wektor " + kv.Key + " (zegar testowy w panelu diagnostycznym, obszar Warszawa)",
+                    Label = "Wektor " + kv.Key + " (klucze testowe, zegar testowy, obszar Warszawa)",
                     Expect = (string)v["expected_status"] + " " + v["reason"],
                     Build = (now, seq) => Bytes.FromHex(hex),
                 });
