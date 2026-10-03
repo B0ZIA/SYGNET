@@ -1,0 +1,6 @@
+<linker>
+  <!-- IL2CPP nie może wyciąć kryptografii (Ed25519 przez refleksję/fabryki BouncyCastle). -->
+  <assembly fullname="BouncyCastle.Cryptography" preserve="all"/>
+  <!-- ZXing.Net 0.16.11 nie ma już osobnej wersji zxing.unity.dll; używamy lib/netstandard2.0/zxing.dll. -->
+  <assembly fullname="zxing" preserve="all"/>
+</linker>
