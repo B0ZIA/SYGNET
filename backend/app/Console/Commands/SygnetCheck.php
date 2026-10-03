@@ -25,9 +25,9 @@ class SygnetCheck extends Command
         $this->line('Katalog kluczy:   '.$keys->directory());
         $this->line('ROOT z kluczy:    '.($h['root'] ?? '–'));
         $this->line('ROOT w eksporcie: '.($h['store_root'] ?? '–'));
-        $this->line('ROOT aplikacji:   '.($h['app_root'] ?? '– (brak RootKey.cs w repo)'));
-        $this->table(['ID', 'Wydawca', 'Klucz', 'W trust store', 'Pasuje'], array_map(fn ($r) => [
-            $r['id'], $r['name'], $r['has_key'] ? 'tak' : '–', $r['in_store'] ? 'tak' : '–', $r['match'] ? 'tak' : '–',
+        $this->line('ROOT aplikacji:   '.($h['app_root'] ?? '– (ustaw SYGNET_APP_ROOT w .env)'));
+        $this->table(['ID', 'Wydawca', 'Odcisk klucza (seed)', 'Odcisk w certyfikacie', 'Pasuje'], array_map(fn ($r) => [
+            $r['id'], $r['name'], $r['key_fp'] ?? '–', $r['cert_fp'] ?? '–', $r['match'] ? 'tak' : 'NIE',
         ], $h['issuers']));
 
         if ($h['ok']) {

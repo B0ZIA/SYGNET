@@ -97,6 +97,7 @@ SYGNET_SECOND_PIN=1234                    # PIN drugiego operatora przy ewakuacj
 SYGNET_SEQUENCE_START=1000                # numery komunikatów od 1000 – patrz punkt 0.3
 SYGNET_USER_AREA=1261                     # obszar telefonu w podglądzie (1261 = Kraków)
 SYGNET_JURY_INFO=true                     # ramka „Dla oceniających” z hasłem i PIN-em – po ocenie: false
+SYGNET_APP_ROOT=82B7-E5B3-7129-166D       # ROOT wbudowany w aplikację – sygnet:check sprawdzi, czy klucze są te same
 ```
 
 `SYGNET_JURY_INFO=true` pokazuje na stronie logowania i w oknie PIN-u ramkę „Dla oceniających” z hasłem i PIN-em

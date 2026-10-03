@@ -60,7 +60,10 @@ final class KeyHealth
             if ($hasKey && $cert && ! $match) {
                 $problems[] = "Klucz wydawcy {$id} nie pasuje do jego certyfikatu – klucze i eksport pochodzą z różnych sygnet:init.";
             }
-            $rows[] = ['id' => $id, 'name' => $issuer['name'], 'has_key' => $hasKey, 'in_store' => (bool) $cert, 'match' => $match];
+            $rows[] = [
+                'id' => $id, 'name' => $issuer['name'], 'has_key' => $hasKey, 'in_store' => (bool) $cert, 'match' => $match,
+                'key_fp' => $hasKey ? $keys->fingerprint($id) : null, 'cert_fp' => $cert?->fingerprint(),
+            ];
         }
 
         return [
@@ -74,9 +77,14 @@ final class KeyHealth
         ];
     }
 
-    /** Odcisk ROOT wbudowany w aplikację (SYGNET_Unity/.../RootKey.cs w repo); null, gdy pliku nie ma. */
+    /** Odcisk ROOT wbudowany w aplikację: SYGNET_APP_ROOT z .env albo RootKey.cs z repo; null, gdy nie wiadomo. */
     public static function appRoot(): ?string
     {
+        $declared = strtoupper(trim((string) config('sygnet.app_root_fingerprint')));
+        if ($declared !== '') {
+            return $declared;
+        }
+
         $path = config('sygnet.paths.app_root_key');
         if (! $path || ! is_file($path)) {
             return null;

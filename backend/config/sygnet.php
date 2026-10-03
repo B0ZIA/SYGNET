@@ -52,6 +52,9 @@ return [
     // obszar telefonu odbiorcy w podglądzie i w kontrolnej weryfikacji (demo: HackYeah w Krakowie)
     'demo_user_area' => (int) env('SYGNET_USER_AREA', 1261),
 
+    // odcisk ROOT wbudowanego w aplikację (gdy na serwerze nie ma SYGNET_Unity/…/RootKey.cs) – do sygnet:check
+    'app_root_fingerprint' => (string) env('SYGNET_APP_ROOT', ''),
+
     // pierwszy numer sequence w nowej bazie (np. 1000 na serwerze, jeśli telefony widziały numery z laptopa)
     'sequence_start' => (int) env('SYGNET_SEQUENCE_START', 1),
 
