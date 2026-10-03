@@ -15,7 +15,8 @@ namespace Sygnet.Core
         public readonly int DetHop;           // 2,5 ms
         public readonly int DetMinWindows;    // 120 ms w krokach detekcji
         public readonly int SymbolPeriod;     // 50 ms
-        readonly int preambleToData;          // od narastającego zbocza 5200 Hz do pierwszego symbolu: 200 + 50 ms
+        public readonly int PreambleToData;   // od narastającego zbocza 5200 Hz do pierwszego symbolu: 200 + 50 ms
+        public readonly int SyncMargin;       // maks. przesunięcie przy dostrajaniu t0 (12 ms)
         readonly int analyzeFrom, analyzeTo;  // [6, 34] ms od początku symbolu
 
         readonly ToneBank detBank;            // 1000 Hz, 5200 Hz
@@ -32,7 +33,8 @@ namespace Sygnet.Core
             DetHop = ModemConstants.SamplesTrunc(sampleRate, ModemConstants.DetHopMs);
             DetMinWindows = (int)(ModemConstants.DetMinMs / ModemConstants.DetHopMs);
             SymbolPeriod = ModemConstants.Samples(sampleRate, ModemConstants.SymbolPeriodMs);
-            preambleToData = ModemConstants.SamplesTrunc(sampleRate, ModemConstants.PreambleToneMs + ModemConstants.PreambleGapMs);
+            PreambleToData = ModemConstants.SamplesTrunc(sampleRate, ModemConstants.PreambleToneMs + ModemConstants.PreambleGapMs);
+            SyncMargin = ModemConstants.SamplesTrunc(sampleRate, ModemConstants.SyncSearchMs) + 1;
             analyzeFrom = ModemConstants.SamplesTrunc(sampleRate, ModemConstants.AnalyzeFromMs);
             analyzeTo = ModemConstants.SamplesTrunc(sampleRate, ModemConstants.AnalyzeToMs);
 
@@ -66,9 +68,12 @@ namespace Sygnet.Core
         public int DetectionWindowCount(int length) => length < DetWindow ? 0 : (length - DetWindow) / DetHop;
 
         /// <summary>P(1000 Hz) i P(5200 Hz) dla okna detekcji o indeksie <paramref name="k"/> (start = k·hop).</summary>
-        public void DetectionPowers(float[] x, int k, out double pA, out double pB)
+        public void DetectionPowers(float[] x, int k, out double pA, out double pB) => DetectionPowersAt(x, k * DetHop, out pA, out pB);
+
+        /// <summary>P(1000 Hz) i P(5200 Hz) dla okna detekcji zaczynającego się w próbce <paramref name="start"/>.</summary>
+        public void DetectionPowersAt(float[] x, int start, out double pA, out double pB)
         {
-            detBank.Powers(x, k * DetHop, detPow);
+            detBank.Powers(x, start, detPow);
             pA = detPow[0];
             pB = detPow[1];
         }
@@ -86,7 +91,7 @@ namespace Sygnet.Core
         }
 
         /// <summary>t0 z indeksu okna, w którym zaczyna się ton 5200 Hz (synchronizacja od NARASTAJĄCEGO zbocza).</summary>
-        public int StartFromOnsetWindow(int m) => m * DetHop + DetWindow / 2 + preambleToData;
+        public int StartFromOnsetWindow(int m) => m * DetHop + DetWindow / 2 + PreambleToData;
 
         /// <summary>
         /// Szuka ≥ need okien z P(1000) &gt; 0,5, po których w ciągu ≤ need okien zaczyna się ≥ need okien z P(5200) &gt; 0,5.
@@ -199,7 +204,12 @@ namespace Sygnet.Core
             int t = RefineStart(x, length, t0);
             if (t < 0) return null;
             int flen = ReadFrameLen(x, length, t);
-            if (flen < 0) return null;
+            return flen < 0 ? null : DecodeFrom(x, length, t, flen);
+        }
+
+        /// <summary>Dekoduje 4 + frame_len symboli od dostrojonego <paramref name="t"/> i sprawdza CRC; null przy błędzie.</summary>
+        public byte[] DecodeFrom(float[] x, int length, int t, int flen)
+        {
             var frame = new byte[4 + flen];
             for (int k = 0; k < frame.Length; k++)
             {
