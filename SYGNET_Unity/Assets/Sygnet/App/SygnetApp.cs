@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Sygnet.App.UI;
 using Sygnet.Core;
@@ -16,7 +17,9 @@ namespace Sygnet.App
     /// <summary>
     /// Bootstrap i stan aplikacji: trust store (zweryfikowany wbudowanym ROOT), Storage, nawigacja ekranów
     /// i jedna ścieżka odbioru ramki: Verify → Commit → skrzynka → alarm → ekran wyniku.
-    /// W tle (Android) zamiast ekranu wyniku – powiadomienie; po powrocie do aplikacji pokazujemy ten wynik.
+    /// Nowy komunikat nie zabiera ekranu, gdy użytkownik coś czyta: trafia do kolejki z paskiem „Nowy komunikat”
+    /// (ważne alarmy na początek), a „OK” na ekranie wyniku otwiera kolejny. W tle (Android) – powiadomienie,
+    /// a po powrocie do aplikacji wszystkie odebrane w tle komunikaty są w tej samej kolejce.
     /// </summary>
     public class SygnetApp : MonoBehaviour
     {
@@ -53,8 +56,24 @@ namespace Sygnet.App
         public bool TestClock { get; private set; }
 
         readonly object storeLock = new object();      // Store używa też wątek nasłuchu w tle
-        volatile InboxEntry pendingFromBackground;     // do pokazania po powrocie do aplikacji
+        readonly ConcurrentQueue<InboxEntry> fromBackground = new ConcurrentQueue<InboxEntry>();   // do kolejki po powrocie
         int notificationId = 100;                      // 1 = stałe powiadomienie usługi nasłuchu
+
+        /// <summary>Komunikat czekający na przeczytanie (odebrany w trakcie czytania innego albo przerwany).</summary>
+        sealed class Pending
+        {
+            public VerificationResult Result;
+            public long ReceivedAt;
+            public bool Interrupted;
+            public long Order;
+        }
+
+        readonly List<Pending> pending = new List<Pending>();
+        long pendingOrder;
+        NewMessageBanner banner;
+
+        /// <summary>Ile komunikatów czeka na przeczytanie (pasek „Nowy komunikat”).</summary>
+        public int PendingCount => pending.Count;
 
         /// <summary>Bieżący czas UTC (unix s); przy zegarze testowym przesunięty do czasu wektorów.</summary>
         public long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds() + (TestClock ? testClockOffset : 0);
@@ -97,6 +116,7 @@ namespace Sygnet.App
             Onboarding = Add(new OnboardingScreen(this, canvasRoot));
             DebugPanel = Add(new DebugScreen(this, canvasRoot));
             BuildToast();
+            banner = new NewMessageBanner(this, canvasRoot, OpenPending);
             if (Store.Onboarded)
             {
                 Show(Home);
@@ -164,10 +184,94 @@ namespace Sygnet.App
                 return r;
             }
             Alarm(r);
-            Result.ReturnTo = Home;
-            Result.Show(r, entry.receivedAt, null);
-            Show(Result);
+            Present(r, entry.receivedAt, source == FrameSource.Qr);
             return r;
+        }
+
+        // ───────────── kolejka komunikatów ─────────────
+
+        /// <summary>
+        /// Nowy wynik. Na ekranie nasłuchu (i po skanie QR, który użytkownik sam zrobił) – od razu. W trakcie czytania
+        /// innego wyniku albo przeglądania skrzynki – do kolejki z paskiem; nic nie znika użytkownikowi sprzed oczu.
+        /// </summary>
+        void Present(VerificationResult r, long receivedAt, bool userInitiated)
+        {
+            if (userInitiated || (current == Home && pending.Count == 0))
+            {
+                OpenResult(r, receivedAt, null);
+                return;
+            }
+            Enqueue(r, receivedAt, false);
+            if (current == Home) OpenNextPending();
+            else if (!Vibrates(r)) StartCoroutine(Vibrate(1));            // sam pasek mógłby umknąć
+        }
+
+        void Enqueue(VerificationResult r, long receivedAt, bool interrupted)
+        {
+            pending.Add(new Pending { Result = r, ReceivedAt = receivedAt, Interrupted = interrupted, Order = pendingOrder++ });
+            UpdateBanner();
+        }
+
+        /// <summary>Prawdziwy alarm lotniczy, ewakuacja i zagrożenie chemiczne – przed resztą; dalej kolejność odbioru.</summary>
+        static int Priority(Pending p) => p.Result.Status == VerifyStatus.Verified && AlertNotification.IsUrgent(p.Result) ? 0 : 1;
+
+        Pending First()
+        {
+            Pending best = null;
+            foreach (var p in pending)
+                if (best == null || Priority(p) < Priority(best) || (Priority(p) == Priority(best) && p.Order < best.Order))
+                    best = p;
+            return best;
+        }
+
+        /// <summary>Dotknięcie paska: otwórz czekający komunikat; czytany właśnie wynik wraca do kolejki („Dokończ czytanie”).</summary>
+        public void OpenPending()
+        {
+            if (pending.Count == 0) return;
+            var next = First();
+            pending.Remove(next);
+            // po przeczytaniu wracamy tam, skąd użytkownik przyszedł (np. do skrzynki), a przerwany wynik czeka w kolejce
+            var back = current == Result ? Result.ReturnTo : current;
+            if (current == Result && Result.Current != null) Enqueue(Result.Current, Result.ReceivedAt, true);
+            OpenResult(next.Result, next.ReceivedAt, null, back);
+        }
+
+        /// <summary>„OK” albo „wstecz” na ekranie wyniku: kolejny czekający komunikat albo powrót.</summary>
+        public void CloseResult()
+        {
+            if (pending.Count > 0) OpenNextPending(Result.ReturnTo);
+            else Show(Result.ReturnTo ?? Home);
+        }
+
+        void OpenNextPending(AppScreen returnTo = null)
+        {
+            var next = First();
+            pending.Remove(next);
+            OpenResult(next.Result, next.ReceivedAt, null, returnTo);
+        }
+
+        void OpenResult(VerificationResult r, long receivedAt, string notice, AppScreen returnTo = null)
+        {
+            Result.ReturnTo = returnTo ?? Home;
+            Result.Show(r, receivedAt, notice);
+            if (current == Result) Result.BeginEnter();                  // nowa treść na tym samym ekranie – z animacją
+            else Show(Result);
+            UpdateBanner();
+        }
+
+        void UpdateBanner()
+        {
+            if (banner == null) return;
+            var first = First();
+            bool visible = first != null && current != Onboarding;
+            Result.SetTopInset(visible && current == Result ? NewMessageBanner.ResultInset : 0);
+            if (!visible)
+            {
+                banner.Hide();
+                return;
+            }
+            float top = current == Result ? 24 : Ui.BelowHeader;              // pod nagłówkiem podekranu, nie na „wstecz”
+            banner.Show(first.Result, first.Interrupted, pending.Count, top);
         }
 
         /// <summary>
@@ -178,7 +282,7 @@ namespace Sygnet.App
         {
             var r = Receive(frame, FrameSource.Audio, out var entry);
             if (entry == null) return;
-            pendingFromBackground = entry;
+            fromBackground.Enqueue(entry);
             AlertNotification.Post(r, Trust, System.Threading.Interlocked.Increment(ref notificationId));
         }
 
@@ -205,15 +309,23 @@ namespace Sygnet.App
             }
         }
 
-        /// <summary>Powrót z tła: pokaż ostatni komunikat odebrany w tle (np. po dotknięciu powiadomienia).</summary>
+        /// <summary>
+        /// Powrót z tła: komunikaty odebrane w tle trafiają do kolejki (wszystkie, nie tylko ostatni). Na ekranie nasłuchu
+        /// od razu otwiera się pierwszy; jeśli użytkownik coś czytał – zostaje pasek „Nowy komunikat”.
+        /// </summary>
         void OnApplicationPause(bool paused)
         {
-            if (paused) return;
-            var e = pendingFromBackground;
-            pendingFromBackground = null;
-            if (e == null || current == Onboarding) return;
-            OpenInboxEntry(e);
+            if (paused || current == Onboarding) return;
+            bool any = false;
+            while (fromBackground.TryDequeue(out var e))
+            {
+                var r = Verifier.Verify(Bytes.FromHex(e.frameHex), Trust, Now, Store.UserArea, Store.Revoked, null);
+                Enqueue(r, e.receivedAt, false);
+                any = true;
+            }
+            if (!any) return;
             Home.Refresh();
+            if (current == Home) OpenNextPending();
         }
 
         /// <summary>Komunikat już otrzymany: pokaż istniejący wpis, bez alarmu.</summary>
@@ -222,19 +334,18 @@ namespace Sygnet.App
             var entry = Store.FindAuthentic(dup.Payload.IssuerId, dup.Payload.Sequence);
             var frame = entry != null ? Bytes.FromHex(entry.frameHex) : dup.RawFrame;
             var r = Verifier.Verify(frame, Trust, Now, Store.UserArea, Store.Revoked, null);
-            Result.ReturnTo = Home;
-            Result.Show(r, entry?.receivedAt ?? Now, "Ten komunikat jest już w skrzynce");
-            Show(Result);
+            OpenResult(r, entry?.receivedAt ?? Now, "Ten komunikat jest już w skrzynce");
         }
 
         /// <summary>Wpis skrzynki: ponowna weryfikacja na bieżący czas (np. teraz już NIEAKTUALNY).</summary>
         public void OpenInboxEntry(InboxEntry e, AppScreen returnTo = null)
         {
             var r = Verifier.Verify(Bytes.FromHex(e.frameHex), Trust, Now, Store.UserArea, Store.Revoked, null);
-            Result.ReturnTo = returnTo ?? Home;
-            Result.Show(r, e.receivedAt, null);
-            Show(Result);
+            OpenResult(r, e.receivedAt, null, returnTo);
         }
+
+        /// <summary>Czy <see cref="Alarm"/> sam wibruje (zweryfikowany alarm/ewakuacja/chemia albo odrzucenie).</summary>
+        static bool Vibrates(VerificationResult r) => AlertNotification.IsUrgent(r);
 
         void Alarm(VerificationResult r)
         {
@@ -284,9 +395,11 @@ namespace Sygnet.App
             current = s;
             s.Root.gameObject.SetActive(true);
             s.Root.SetAsLastSibling();
+            banner?.BringToFront();
             toast.SetAsLastSibling();
             s.BeginEnter();
             s.OnShow();
+            UpdateBanner();                                   // pod nagłówkiem nowego ekranu (albo schowany)
         }
 
         public void ShowToast(string text, float seconds = 3f)
@@ -310,6 +423,7 @@ namespace Sygnet.App
                 foreach (var rt in safeAreas) ApplySafeArea(rt, lastSafeArea);
             }
             if (toast.gameObject.activeSelf && Time.unscaledTime > toastUntil) toast.gameObject.SetActive(false);
+            banner.Tick(Time.unscaledDeltaTime);
 
             if (BackPressed() && current != null && !current.OnBack() && current != Home && current != Onboarding)
                 Show(Home);

@@ -25,12 +25,27 @@ namespace Sygnet.App.UI
         /// <summary>Dokąd wraca „OK” i przycisk wstecz (ekran główny albo skrzynka).</summary>
         public AppScreen ReturnTo;
 
+        Button ok;
+        float topInset;
+
+        /// <summary>Miejsce na pasek „Nowy komunikat” – treść wyniku zsuwa się pod niego zamiast pod nim znikać.</summary>
+        public void SetTopInset(float inset)
+        {
+            if (Mathf.Approximately(inset, topInset)) return;
+            topInset = inset;
+            body.offsetMax = new Vector2(body.offsetMax.x, -inset);
+        }
+
+        /// <summary>Wyświetlany wynik i czas odbioru – do kolejki, gdy użytkownik przejdzie do nowego komunikatu.</summary>
+        public VerificationResult Current => current;
+        public long ReceivedAt { get; private set; }
+
         public ResultScreen(SygnetApp app, Transform canvas) : base(app, canvas, "Result", Theme.Verified)
         {
             body = Ui.Rect(Safe, "Body");
             content = Ui.Scroll(body, "Scroll", 28, new RectOffset(56, 56, 40, 48));
 
-            var ok = Ui.Button(Safe, "OK", ButtonKind.Primary, () => App.Show(ReturnTo ?? App.Home));
+            ok = Ui.Button(Safe, "OK", ButtonKind.Primary, () => App.CloseResult());
             Ui.Bottom((RectTransform)ok.transform, 40, Theme.ButtonHeight, Theme.Margin);
             relayButton = Ui.Button(Safe, "Przekaż dalej", ButtonKind.OnColor, Relay, Icons.Speaker);
             Ui.Bottom((RectTransform)relayButton.transform, 40 + Theme.ButtonHeight + 24, Theme.ButtonHeight, Theme.Margin);
@@ -40,18 +55,19 @@ namespace Sygnet.App.UI
         public void Show(VerificationResult r, long receivedAt, string notice)
         {
             current = r;
+            ReceivedAt = receivedAt;
             Background.color = Theme.ForStatus(r.Status);
             for (int i = content.childCount - 1; i >= 0; i--) Object.Destroy(content.GetChild(i).gameObject);
             Build(r, receivedAt, notice);
             relayButton.gameObject.SetActive(r.IsAuthentic);                // przekazujemy tylko prawdziwe
             int buttons = r.IsAuthentic ? 2 : 1;
-            Ui.Stretch(body, 0, 0, 0, 40 + buttons * Theme.ButtonHeight + (buttons - 1) * 24 + 24);
+            Ui.Stretch(body, 0, topInset, 0, 40 + buttons * Theme.ButtonHeight + (buttons - 1) * 24 + 24);
             content.anchoredPosition = Vector2.zero;
         }
 
         public override bool OnBack()
         {
-            App.Show(ReturnTo ?? App.Home);
+            App.CloseResult();
             return true;
         }
 
@@ -59,6 +75,8 @@ namespace Sygnet.App.UI
 
         public override void Tick()
         {
+            int waiting = App.PendingCount;
+            Ui.SetLabel(ok, waiting > 0 ? "OK · następny (" + waiting + ")" : "OK");    // „OK” prowadzi do kolejki
             if (current == null || !relayButton.gameObject.activeSelf) return;
             bool playing = App.Relay.IsPlaying;
             relayButton.interactable = !playing;

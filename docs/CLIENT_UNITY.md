@@ -199,6 +199,11 @@ Zapis jako JSON w `Application.persistentDataPath`. Wszystko działa offline.
 1. **Onboarding** (pierwsze uruchomienie): wybór obszaru (Warszawa, Kraków…), prośba o mikrofon i kamerę, ekran „Klucz główny: 6A38-03D5-F059-902A, porównaj z wydrukiem w urzędzie”.
 2. **Nasłuch** (ekran główny): duży pulsujący okrąg „Nasłuchuję komunikatów…”, animowane słupki widma, ikona ✈️ „działa bez internetu”, przyciski: `▦ Skanuj QR` i `📥 Skrzynka`. Po wykryciu preambuły pokaż „Odbieram… 34%” (postęp wg `frame_len`). To świetnie wygląda na demo.
 3. **Wynik** (pełny ekran w kolorze statusu): status, nadawca (z certyfikatu) + odcisk, typ z ikoną, obszar, czas wydania i „ważne do”, dopisek, **instrukcja „Co robić”** (z `AlertTypes`), przy dwóch podpisach „Podpisali: Wojewoda Mazowiecki + Komendant PSP”. Przyciski: `🔊 Przekaż dalej`, `OK`. Dla FORGED duże wyjaśnienie powodu po ludzku (`PROTOCOL.md` §7).
+   **Kolejka:** komunikat odebrany, gdy użytkownik czyta inny wynik albo przegląda skrzynkę, nie zabiera ekranu – telefon wibruje,
+   a u góry pojawia się pasek „Nowy komunikat · STATUS · typ” z przyciskiem „Pokaż” (`NewMessageBanner`). Zweryfikowany alarm,
+   ewakuacja i zagrożenie chemiczne idą na początek kolejki. „OK” otwiera kolejny („OK · następny (n)”), a komunikat, którego
+   czytanie przerwano przez „Pokaż”, wraca do kolejki („Dokończ czytanie”). Na ekranie nasłuchu i po własnym skanie QR wynik
+   otwiera się od razu; odebrane w tle trafiają do tej samej kolejki po powrocie do aplikacji.
 4. **Skrzynka:** lista otrzymanych komunikatów z kolorowym paskiem statusu, tap otwiera ekran wyniku.
 5. **O aplikacji / zaufani nadawcy:** lista wydawców z trust store (nazwa, zakres, odcisk, ważność, unieważniony?).
 6. **Panel debug** (ukryty, 5× tap w logo): sample rate, RMS, `P(1000)`/`P(5200)` na żywo, ostatnia surowa ramka hex, przycisk „Dekoduj testowe WAV” (pliki ze StreamingAssets, czytane przez `UnityWebRequest`). Ratuje skórę, gdy coś nie działa na scenie.
