@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "root_fingerprint": "6A38-03D5-F059-902A",
+  "issuers": [
+    {
+      "cert_b64": "AQABiojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1xpVbkAbRggAAEAABlEb3fDs2R6dHdvIE9wZXJhY3lqbmUgUlNa",
+      "root_sig_b64": "s2Vp8alTf2bbxPJonOiMjU2ii7Kf/+iul8Shxzpp5TJNul4OIWRj11EnJHUZUBh7Xwbh1mnTRqeobgqJQYXYBQ=="
+    },
+    {
+      "cert_b64": "AQAD7UkoxijRwsbq6QM4kFmVYSlZJzpcY/k2NsFGFKyHN9FpVbkAbRggAAEADhNXb2pld29kYSBNYXpvd2llY2tp",
+      "root_sig_b64": "aNnotxv/u32CPSg3UsOuLpgz/SZsBLCabAl/KQFiU4Py7IwYs4Snu9QuIsc7FtUcOemCpwCpLl3nAOOd9o7jAQ=="
+    },
+    {
+      "cert_b64": "AQAFbnoc3Smwt4/ROvTFWY/v9O8qlxZuPKby5Pv8zYBQW/FpVbkAbRggAAEADiJLb21lbmRhbnQgV29qZXfDs2R6a2kgUFNQIE1hem93c3pl",
+      "root_sig_b64": "opuAc+VQ9h1RO0nVmojperB0cvKblyzXpRpRq1V3ZnOQS+Scs5ReUoIixRDtr7kxWbcyJqeaovPRw5G6IDV2Ag=="
+    },
+    {
+      "cert_b64": "AQAGiodf/x6zhFFXes1a/uQFRWVo3XyJ4JCGOgVXvHr0nxdpVbkAbRggAAEFuRhQcmV6eWRlbnQgbS5zdC4gV2Fyc3phd3k=",
+      "root_sig_b64": "kwW090mtQMV6MKQ77X8UKjU7flDh2yKn6TjxylEfeQqMoB2gtZ2xqNoe9rdmxZMfhrs/d/tDndpep6BIHT6ICQ=="
+    }
+  ]
+}

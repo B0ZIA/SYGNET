@@ -1,0 +1,19 @@
+{
+    "name": "Sygnet.Editor",
+    "rootNamespace": "Sygnet.Editor",
+    "references": [
+        "Sygnet.Core",
+        "Sygnet.App"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
