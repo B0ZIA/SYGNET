@@ -93,7 +93,7 @@ APP_ENV=production
 APP_DEBUG=false
 
 SYGNET_CONSOLE_PASSWORD=TU_DLUGIE_HASLO   # hasło do konsoli – OBOWIĄZKOWO
-SYGNET_SECOND_PIN=TU_PIN                  # PIN drugiego operatora przy ewakuacji (lokalnie 1234)
+SYGNET_SECOND_PIN=1234                    # PIN drugiego operatora przy ewakuacji – można zmienić tutaj
 SYGNET_SEQUENCE_START=1000                # numery komunikatów od 1000 – patrz punkt 0.3
 SYGNET_USER_AREA=1261                     # obszar telefonu w podglądzie (1261 = Kraków)
 ```
