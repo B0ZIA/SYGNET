@@ -82,7 +82,12 @@
             <div class="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-4 text-sm text-muted">
                 <span class="mono" x-text="`📦 ${estimateBytes} B`"></span>
                 <span class="mono" x-text="`🔊 ~${estimateSeconds.replace('.', ',')} s (${$store.tx.repeat}×)`"></span>
-                <span x-show="signed" class="mono text-go" x-text="signed ? `podpisano · seq ${signed.sequence}` : ''"></span>
+                <span x-show="signed" class="mono text-go" x-text="signed ? `podpisano · nr ${signed.sequence}` : ''"></span>
+                <span x-show="signed" class="text-xs text-muted">ponowne „Nadaj” = ten sam komunikat – telefon, który go ma, pokaże tylko „Już w skrzynce”</span>
+                <button type="button" x-show="signed" class="btn btn-ghost !px-3 !py-1.5 !text-xs" :disabled="busy || $store.tx.playing"
+                        @click="newNumber()" title="Następne nadanie podpisze ten sam formularz od nowa, z nowym numerem">
+                    Nowy numer
+                </button>
                 <template x-for="(msgs, field) in errors" :key="field">
                     <span class="font-semibold text-alarm" x-text="msgs[0]"></span>
                 </template>

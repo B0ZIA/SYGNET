@@ -259,6 +259,12 @@ Alpine.data('consoleApp', () => ({
         if (action === 'poster') window.open(`/poster/${b.id}`, '_blank');
     },
 
+    /** Ten sam formularz, ale następne nadanie podpisze nowy komunikat (nowy numer) – telefon go nie pominie. */
+    newNumber() {
+        this.signed = null;
+        this.$store.tx.select(null);
+    },
+
     pick(b) {
         if (this.$store.tx.playing) return;
         this.signed = null;

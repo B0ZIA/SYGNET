@@ -179,8 +179,10 @@ namespace Sygnet.App
             var r = Receive(frame, source, out var entry);
             if (entry == null)
             {
-                // MALFORMED: ignoruj po cichu; DUPLICATE z dźwięku: bez alarmu
+                // MALFORMED: ignoruj po cichu. DUPLICATE z dźwięku (np. powtórka w TV): bez alarmu i bez zabierania ekranu,
+                // ale z krótką informacją – inaczej odbiór dochodzi do 99% i „nic się nie dzieje”
                 if (r.Status == VerifyStatus.Duplicate && source == FrameSource.Qr) ShowDuplicate(r);
+                else if (r.Status == VerifyStatus.Duplicate) ShowToast("Już w skrzynce: " + AlertTypes.Get(r.Payload.Type).Name);
                 return r;
             }
             Alarm(r);
