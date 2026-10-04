@@ -1,20 +1,16 @@
 # SYGNET
 
 **Podpisane komunikaty kryzysowe, które sprawdzisz bez internetu.**
-HackYeah 2026 · kategoria Defence · zespół 2-osobowy
+HackYeah 2026 · kategoria Defence
 
-> Dla Claude Code: to jest przegląd projektu. Szczegóły:
-> - `docs/PROTOCOL.md`: **specyfikacja protokołu (źródło prawdy)**
-> - `docs/CLIENT_UNITY.md`: aplikacja obywatela (Unity, Android)
-> - `docs/CONSOLE_LARAVEL.md`: konsola nadawcza + laboratorium ataków (Laravel)
-> - `tools/sygnet_ref.py`: implementacja referencyjna protokołu i modemu (Python, przetestowana)
-> - `testvectors/`: wektory testowe (JSON + WAV), które obie implementacje muszą przechodzić
+**Wypróbuj:**
 
----
+- konsola nadawcza: **https://api.hackathon.copentro.com/console** (hasło dla oceniających jest na stronie logowania),
+- aplikacja na Androida: **https://api.hackathon.copentro.com/sygnet.apk**.
 
 ## 1. Problem
 
-W czasie ataku internet i systemy państwowe mogą przestać działać, a ludzie dostają komunikaty z radia, plakatów, SMS-ów i od sąsiadów. **Żadnego z tych kanałów obywatel nie może zweryfikować.** Przeciwnik to wykorzystuje:
+W czasie ataku internet i systemy państwowe mogą przestać działać, a ludzie dostają komunikaty z radia, telewizji, plakatów i od sąsiadów. **Żadnego z tych kanałów obywatel nie może zweryfikować.** Przeciwnik to wykorzystuje:
 
 - **maj 2024:** atak na PAP i fałszywa depesza o mobilizacji 200 tys. Polaków,
 - **sierpień 2023:** nieautoryzowany sygnał „Radio-Stop” zatrzymał ok. 20 pociągów PKP, bo system nie sprawdzał, kto nadaje,
@@ -24,20 +20,44 @@ W czasie ataku internet i systemy państwowe mogą przestać działać, a ludzie
 
 Każdy oficjalny komunikat dostaje **podpis cyfrowy Ed25519** („pieczątkę”). Komunikat i podpis to ~120 bajtów, które da się przesłać **dowolnym kanałem**:
 
-- 🔊 **dźwiękiem:** kilkusekundowy „ćwierk” w radiu, z megafonu, z głośnika telefonu,
+- 🔊 **dźwiękiem:** kilkusekundowy „ćwierk” po komunikacie w radiu, telewizji, z megafonu albo głośnika telefonu,
 - ▦ **kodem QR:** plakat, ekran TV, drzwi urzędu.
 
-Telefon obywatela ma wbudowany klucz publiczny i **sprawdza podpis offline**:
+Telefon obywatela ma wbudowany klucz główny (ROOT) i **sprawdza podpis offline**:
 
 - ✅ **ZWERYFIKOWANO**: kto wydał, kiedy, dla jakiego obszaru i co robić,
 - ⚠️ **NIEAKTUALNY**: prawdziwy, ale wygasły (np. odtworzone nagranie),
-- 🟥 **FAŁSZYWKA**: z wyjaśnieniem powodu.
+- 🟥 **FAŁSZYWKA** / **NIEPEŁNY PODPIS**: z wyjaśnieniem powodu po ludzku.
+
+**Nasłuch w tle:** aplikacja słucha także wtedy, gdy telefon leży w kieszeni z wygaszonym ekranem. Gdy po komunikacie w radiu albo telewizji zabrzmi sygnał SYGNET, na ekranie blokady pojawia się powiadomienie z wynikiem.
 
 **Przekaż dalej:** telefon odtwarza zweryfikowany komunikat dźwiękiem sąsiadowi. Informacja rozchodzi się od człowieka do człowieka bez sieci, a nadal nie da się jej podrobić.
 
-**Nasłuch w tle:** aplikacja słucha także wtedy, gdy telefon leży w kieszeni z wygaszonym ekranem. Gdy w telewizji albo radiu po komunikacie zabrzmi sygnał SYGNET, przychodzi powiadomienie: ✅ prawdziwy albo 🟥 fałszywka.
+## 3. Co działa
 
-## 3. Bezpieczeństwo w skrócie
+**Aplikacja obywatela** (`SYGNET_Unity/`, Unity 6000.3.8f1, Android):
+
+- weryfikacja Ed25519 w telefonie (BouncyCastle); aplikacja **nie ma uprawnienia INTERNET** i działa w trybie samolotowym,
+- odbiór dźwiękiem: modem 2 × 16-FSK, dekodowanie strumieniowe z mikrofonu, łączenie powtórzeń ramki; dekoduje przy SNR 6 dB i z pogłosem,
+- nasłuch w tle (usługa pierwszoplanowa Androida) i powiadomienie z wynikiem na ekranie blokady,
+- skaner QR (ZXing.Net),
+- ekran wyniku: ZWERYFIKOWANO / INNY OBSZAR / NIEAKTUALNY / NIEPEŁNY PODPIS / FAŁSZYWKA, „co robić”, nadawca i odcisk jego klucza, podpisujący, czasy,
+- kolejka komunikatów: nowy komunikat nie zabiera ekranu w trakcie czytania – pojawia się pasek „Nowy komunikat · Pokaż”; powtórzony komunikat daje informację „Już w skrzynce”,
+- skrzynka, „Przekaż dalej”, onboarding (obszar, odcisk ROOT do porównania, zgoda na mikrofon), ekran „Klucze i nadawcy”,
+- okrąg nasłuchu reaguje na dźwięk otoczenia (poziom liczony względem szumu tła), w trakcie odbioru pokazuje postęp,
+- ukryty panel diagnostyczny: 5 × dotknięcie logo.
+
+**Konsola nadawcza** (`backend/`, Laravel 13, PHP 8.4):
+
+- formularz: nadawca, typ, obszar w zakresie nadawcy, ważność, dopisek; podgląd telefonu na żywo i kontrolna weryfikacja tą samą logiką co w aplikacji,
+- nadanie dźwiękiem (modem w JS, Web Audio) z wizualizacją tonów, kod QR, plik WAV, plakat A4 z kodem QR (ważność do 7 dni), historia,
+- ewakuacja wymaga dwóch podpisów: drugi operator zatwierdza ją PIN-em,
+- **laboratorium ataków** (`/attack`): siedem ataków A1–A7, przycisk „Uruchom” od razu nadaje dźwiękiem prawdziwą fałszywkę, a obok widać, co pokaże telefon,
+- **klucze** (`/keys`): odcisk ROOT, certyfikaty urzędów, unieważnienie klucza (KEY_REVOKE od ROOT), eksport trust store dla aplikacji,
+- hasło do konsoli (`SYGNET_CONSOLE_PASSWORD`) i podpowiedź dla oceniających na stronie logowania (`SYGNET_JURY_INFO`),
+- wdrożona na **https://api.hackathon.copentro.com**.
+
+## 4. Bezpieczeństwo w skrócie
 
 | Zagrożenie | Ochrona |
 |---|---|
@@ -50,15 +70,27 @@ Telefon obywatela ma wbudowany klucz publiczny i **sprawdza podpis offline**:
 | Złośliwy QR z linkiem | aplikacja nigdy nie otwiera URL-i |
 | Brak internetu / serwerów | weryfikacja w 100% lokalna, zero zależności sieciowych |
 
-Hierarchia kluczy: **ROOT (offline)** → certyfikaty wydawców (Dowództwo Operacyjne, RCB, wojewodowie, PSP, prezydenci miast) → komunikaty.
+Hierarchia kluczy: **ROOT (offline)** → certyfikaty wydawców (Dowództwo Operacyjne, RCB, wojewodowie, PSP, prezydenci miast) → komunikaty. Odcisk klucza głównego wersji demo: **`82B7-E5B3-7129-166D`**.
 
-## 4. Architektura
+Wszystkie ataki z tabeli można uruchomić w laboratorium ataków:
+
+| | Atak | Wynik w telefonie |
+|---|---|---|
+| A1 | Podszycie się pod wojsko (własny klucz, nazwa Dowództwa Operacyjnego) | FAŁSZYWKA |
+| A2 | Podmiana treści prawdziwego komunikatu | FAŁSZYWKA |
+| A3 | Stare nagranie (prawdziwy alarm sprzed 3 dni) | NIEAKTUALNY |
+| A4 | Cudzy teren (Prezydent Warszawy ogłasza alarm w Krakowie) | FAŁSZYWKA |
+| A5 | Ewakuacja z jednym podpisem | NIEPEŁNY PODPIS |
+| A6 | Zmyślony urząd spoza listy zaufanych | FAŁSZYWKA |
+| A7 | Skradziony, unieważniony klucz urzędu | FAŁSZYWKA |
+
+## 5. Architektura
 
 ```
 ┌─────────────────────────────┐   🔊 dźwięk (radio / głośnik)   ┌──────────────────────────────┐
 │ KONSOLA NADAWCZA (Laravel)  │ ──────────────────────────────▶ │ APLIKACJA OBYWATELA (Unity)  │
-│ laptop, offline             │   ▦ QR (plakat / ekran)        │ Android, tryb samolotowy     │
-│ • formularz + podgląd       │ ──────────────────────────────▶ │ • nasłuch mikrofonu (FSK)    │
+│ serwer albo laptop offline  │   ▦ QR (plakat / ekran)        │ Android, tryb samolotowy     │
+│ • formularz + podgląd       │ ──────────────────────────────▶ │ • nasłuch mikrofonu, w tle   │
 │ • podpis Ed25519 (sodium)   │                                 │ • skaner QR                  │
 │ • modem JS (Web Audio)      │                                 │ • weryfikacja Ed25519 offline│
 │ • laboratorium ataków       │                                 │ • ✅ / ⚠️ / 🟥 + „co robić”   │
@@ -66,74 +98,56 @@ Hierarchia kluczy: **ROOT (offline)** → certyfikaty wydawców (Dowództwo Oper
 └─────────────────────────────┘    (raz, w czasie pokoju)       └──────────────────────────────┘
 ```
 
-Wspólny kontrakt: `docs/PROTOCOL.md` + `testvectors/`. Implementacja referencyjna dekoduje ramki przy SNR 6 dB, z pogłosem, przy 44,1 i 48 kHz (`python3 tools/sygnet_ref.py selftest`).
+Wspólny kontrakt: `docs/PROTOCOL.md` + `testvectors/`. Klucz prywatny nigdy nie trafia do przeglądarki – podpisuje serwer konsoli, przeglądarka tylko gra dźwięk albo pokazuje QR.
 
-## 5. Podział pracy
+## 6. Przetestuj sam (ok. 3 minuty)
 
-| Osoba | Zakres | Dokument |
+1. **Telefon z Androidem:** pobierz i zainstaluj https://api.hackathon.copentro.com/sygnet.apk (zezwól na instalację z nieznanych źródeł). Przy pierwszym uruchomieniu wybierz obszar **Kraków** i zezwól na mikrofon. Możesz włączyć tryb samolotowy.
+2. **Komputer z głośnikiem:** otwórz https://api.hackathon.copentro.com/console – hasło dla oceniających jest na stronie logowania.
+3. Kliknij **„Podpisz i nadaj dźwiękiem”** i trzymaj telefon 0,5–2 m od głośnika (głośność ok. 70%). Po kilku sekundach telefon pokaże **ZWERYFIKOWANO**.
+4. Zakładka **„Laboratorium ataków”**: kliknij „Uruchom” przy dowolnym ataku – telefon pokaże FAŁSZYWKA, NIEAKTUALNY albo NIEPEŁNY PODPIS z powodem.
+5. Gdy jest za głośno: w konsoli **„Kod QR”**, w aplikacji **„Skanuj kod QR”**.
+
+## 7. Uruchomienie lokalne
+
+**Konsola** (`backend/`) – PHP 8.3+ z rozszerzeniem `sodium`, Composer, Node 20+:
+
+```bash
+cd backend
+composer install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate
+npm install
+npm run build
+php artisan sygnet:init --force      # nowe klucze: ROOT, wydawcy, „haker” do laboratorium
+php artisan serve                    # http://127.0.0.1:8000/console
+```
+
+Szczegóły (Windows, klucze testowe, historia do ataku A3, API): [`backend/README.md`](backend/README.md). Na serwerze **nie** uruchamiaj `sygnet:init` – patrz [`backend/DEPLOY.md`](backend/DEPLOY.md).
+
+**Aplikacja** (`SYGNET_Unity/`) – Unity 6000.3.8f1 z modułem Android:
+
+1. Po `sygnet:init` skopiuj `backend/storage/app/export/sygnet_trust_store.json` do `Assets/Resources/` i `RootKey.cs` do `Assets/Sygnet/App/`.
+2. File → Build Profiles → Android → Build.
+
+APK z linku ufa wyłącznie kluczom serwera demo – przy własnych kluczach trzeba zbudować aplikację od nowa. Klucze prywatne (`backend/storage/app/keys/`) nie są w repozytorium.
+
+**Testy:**
+
+| Co | Polecenie | Wynik |
 |---|---|---|
-| **Bozia (Unity)** | aplikacja Android: rdzeń protokołu w C#, dekoder audio, QR, UI, przekaż dalej | `docs/CLIENT_UNITY.md` |
-| **Robert (Laravel)** | konsola, podpisywanie, modem JS, laboratorium ataków, klucze; prezentacja PDF | `docs/CONSOLE_LARAVEL.md` |
+| Aplikacja: protokół, weryfikator, modem (do SNR 6 dB), dekoder strumieniowy, QR | Unity → Window → General → Test Runner → EditMode | 151 testów |
+| Konsola: ramki, podpisy, API, ataki | `cd backend && php artisan test` | 37 testów |
+| Modem JS (zgodność próbek z referencją) | `cd backend && npm test` | 8 testów |
+| Wektory TV1–TV6 bajt w bajt | `cd backend && php artisan sygnet:testvectors` | ALL OK |
+| Implementacja referencyjna | `python3 tools/sygnet_ref.py selftest` (numpy, cryptography) | |
 
-## 6. Harmonogram 24h i punkty synchronizacji
+## 8. Dalszy rozwój
 
-| Godz. | Unity | Laravel | 🔁 Sync |
-|---|---|---|---|
-| 0–3 | U1–U2: projekt, rdzeń, testy TV1–TV6 | L1–L2: projekt, FrameBuilder, `sygnet:testvectors` | **S1: obie strony przechodzą wektory testowe** |
-| 3–7 | U3–U4: dekoder WAV, QR → wynik | L3–L4: `sygnet:init`, broadcast, QR | **S2: QR z konsoli daje ✅ na telefonie** |
-| 7–12 | U5: mikrofon na żywo | L5: modem JS, WAV, wizualizacja | **S3: dźwięk z laptopa daje ✅ na telefonie** |
-| 12–16 | U6–U7: prawdziwe klucze, przekaż dalej, skrzynka | L6: laboratorium ataków | **S4: wszystkie ataki dają oczekiwany wynik** |
-| 16–19 | U7–U8: design, onboarding, debug | L7: podwójny podpis, /keys, UI | **Feature freeze o 19:00** |
-| 19–22 | testy na sali (hałas!), nagranie demo | prezentacja PDF, zrzuty | **2 pełne próby demo** |
-| 22–24 | bufor, poprawki krytyczne | wysłanie zgłoszenia | **Wysłać ≥ 1h przed terminem** |
-
-**Zasada:** po S1 nikt nie zmienia protokołu bez zgody drugiej osoby.
-
-## 7. Scenariusz demo (3 min, Kraków)
-
-Telefony mają ustawiony obszar **Kraków**, konsola (`/console`) też pokazuje podgląd telefonu z Krakowa.
-
-1. **Problem (20 s):** „W maju 2024 Rosjanie wrzucili przez PAP fałszywkę o mobilizacji. Jak obywatel ma odróżnić prawdę, gdy nie ma internetu?”
-2. **Tryb samolotowy:** pokazujemy na telefonach, że nie ma sieci.
-3. **Prawdziwy komunikat:** konsola, Wojewoda Małopolski, Alarm lotniczy, Kraków, dopisek „Schron: piwnice i przejścia podziemne”, ▶. Ćwierk, telefony pokazują **✅ ZWERYFIKOWANO** + instrukcję.
-4. **Atak:** laboratorium (`/attack`), A1 „Podszycie pod Dowództwo Operacyjne”, ▶. Telefony pokazują **🟥 FAŁSZYWKA: podpis nie pasuje**.
-5. **Powtórka:** A3, prawdziwy alarm dla Krakowa sprzed 3 dni. Telefony pokazują **⚠️ NIEAKTUALNY**.
-6. **Ewakuacja Krakowa:** A5 z jednym podpisem daje **🟥 NIEPEŁNY PODPIS**; z konsoli Wojewoda Małopolski + Prezydent Miasta Krakowa (drugi operator zatwierdza PIN-em) daje **✅** z dwoma podpisami.
-7. **Telefon w kieszeni:** aplikacja w tle, ekran zgaszony, nadajemy z konsoli – na ekranie blokady przychodzi powiadomienie **✅ ZWERYFIKOWANO**.
-8. **Sąsiad ostrzega sąsiada:** telefon A, „Przekaż dalej”, telefon B pokazuje **✅**.
-9. **QR:** plakat z kodem (ważny 7 dni, drukowany z konsoli), skan, **✅**.
-10. **Puenta:** „Wróg może wyłączyć internet i podrobić komunikat, ale nie podrobi pieczątki.”
-
-Przed demo: na telefonach 5× dotknij logo → „Wyczyść skrzynkę i pamięć odbioru” (inaczej powtórzone próby pokażą „już w skrzynce”).
-Plan B: jeśli dźwięk zawodzi w hałasie, pokazujemy QR i odtwarzamy WAV z konsoli bezpośrednio przy mikrofonie telefonu.
-
-## 8. Prezentacja (maks. 10 slajdów)
-
-1. **SYGNET**: tytuł + jedno zdanie
-2. **Problem**: PAP 2024, Radio-Stop 2023, fałszywe alarmy radiowe
-3. **Kto ma problem**: obywatele bez internetu, służby, które muszą dotrzeć z prawdziwym komunikatem
-4. **Rozwiązanie**: pieczątka cyfrowa + dowolny kanał (dźwięk / QR) + weryfikacja offline
-5. **Jak to działa**: schemat nadawca → ramka 120 B → telefon
-6. **Bezpieczeństwo**: tabela zagrożeń i ochrony, hierarchia kluczy, 2 podpisy
-7. **Demo**: zrzuty: konsola, ✅, 🟥, laboratorium ataków
-8. **Odporność**: działa bez internetu, prądu sieciowego (radio na baterie), serwerów; przekaż dalej
-9. **Wdrożenie**: niski koszt (bez nowej infrastruktury), integracja z RCB/mObywatel w czasie pokoju, rozwój: kanał SMS, niższe pasmo dla radia AM, podpisy postkwantowe (pole `version`)
-10. **Zespół + podsumowanie**
-
-## 9. Pytania jury i odpowiedzi
-
-- **Czym to się różni od Alertu RCB?** Alert RCB wymaga sieci komórkowej i nie daje się zweryfikować. SYGNET działa przez dowolny kanał, także radio na baterie, i każdy może sprawdzić autentyczność.
-- **Kradzież klucza?** Hierarchia z zakresem obszarów, unieważnianie komunikatem ROOT, 2 podpisy dla komunikatów krytycznych. Produkcyjnie: HSM / karty kryptograficzne.
-- **Da się wyliczyć klucz z podsłuchanych komunikatów?** Nie. Ed25519 to ten sam standard, który chroni SSH i Signala, a podpisy są deterministyczne (odporne na błąd, przez który złamano PS3).
-- **Komputery kwantowe?** Pole `version` w protokole pozwala przejść na podpisy postkwantowe (np. ML-DSA), w pierwszej kolejności przez kanał QR, który zmieści więcej danych.
-- **Hałas, zasięg?** 2 tony na symbol, CRC, powtórzenie ramki. Implementacja referencyjna działa przy SNR 6 dB i z pogłosem. Zawsze jest QR jako drugi kanał.
-- **Zegar telefonu offline?** Telefon trzyma czas z zegara RTC. Tolerancja ±5 min na czas „z przyszłości”.
-
-## 10. Przejrzystość (wymóg HackYeah)
-
-W zgłoszeniu ujawniamy:
-
-- **AI:** koncepcja, specyfikacja protokołu, implementacja referencyjna (`tools/sygnet_ref.py`) i dokumentacja powstały z pomocą Claude (Anthropic). Kod aplikacji i konsoli z pomocą Claude Code. Zespół rozumie i potrafi obronić każdy element.
-- **Biblioteki:** BouncyCastle (MIT), ZXing.Net (Apache 2.0), Laravel (MIT), ext-sodium/libsodium (ISC), Alpine.js (MIT), Tailwind CSS (MIT), Vite (MIT), qrcode (MIT), numpy, cryptography (Python). Fonty Inter i JetBrains Mono (SIL Open Font License 1.1).
-- **Inspiracja:** idea transmisji danych dźwiękiem (np. projekt ggwave). Modem SYGNET to własna, prostsza implementacja.
-- Wszystko powstało podczas HackYeah 2026.
+- **mObywatel:** nasłuch sygnału i skaner QR wbudowane w aplikację, którą ludzie już mają; klucz główny w HSM, klucze urzędów na kartach kryptograficznych.
+- **Podpisany Alert RCB:** ten sam podpis w SMS-ach RCB.
+- **Sieć sąsiedzka:** telefony same przekazują zweryfikowany alarm dalej (Bluetooth), bez sieci.
+- **Standard sojuszników:** kilka kluczy głównych w jednej aplikacji – wspólny system ostrzegania wschodniej flanki NATO.
+- **Podpisy postkwantowe:** protokół ma pole `version`, więc zmiana algorytmu nie psuje zgodności.
