@@ -151,3 +151,10 @@ APK z linku ufa wyłącznie kluczom serwera demo – przy własnych kluczach trz
 - **Sieć sąsiedzka:** telefony same przekazują zweryfikowany alarm dalej (Bluetooth), bez sieci.
 - **Standard sojuszników:** kilka kluczy głównych w jednej aplikacji – wspólny system ostrzegania wschodniej flanki NATO.
 - **Podpisy postkwantowe:** protokół ma pole `version`, więc zmiana algorytmu nie psuje zgodności.
+
+## 9. Przejrzystość (wymóg HackYeah)
+
+- **AI:** koncepcja, specyfikacja protokołu, implementacja referencyjna (`tools/sygnet_ref.py`) i dokumentacja powstały z pomocą Claude (Anthropic). Kod aplikacji i konsoli z pomocą Claude Code. Zespół rozumie i potrafi obronić każdy element.
+- **Biblioteki:** BouncyCastle (MIT), ZXing.Net (Apache 2.0), Laravel (MIT), ext-sodium/libsodium (ISC), Alpine.js (MIT), Tailwind CSS (MIT), Vite (MIT), qrcode (MIT), numpy, cryptography (Python). Fonty Inter i JetBrains Mono (SIL Open Font License 1.1).
+- **Inspiracja:** idea transmisji danych dźwiękiem (np. projekt ggwave). Modem SYGNET to własna, prostsza implementacja.
+- Wszystko powstało podczas HackYeah 2026.
