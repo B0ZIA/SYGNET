@@ -131,11 +131,15 @@ namespace Sygnet.App
         }
 
         /// <summary>Do testów na scenie (panel debug): czyści skrzynkę, seen i unieważnienia, zostawia obszar.</summary>
-        public void ClearMessages()
+        /// <summary>
+        /// Czyści skrzynkę i pamięć odbioru. Unieważnione klucze tylko na życzenie (<paramref name="revokedToo"/>) –
+        /// w wydaniu nigdy, inaczej skradziony, unieważniony klucz znów byłby zaufany.
+        /// </summary>
+        public void ClearMessages(bool revokedToo)
         {
             data.inbox.Clear();
             Seen.Clear();
-            Revoked.Clear();
+            if (revokedToo) Revoked.Clear();
             Save();
         }
     }

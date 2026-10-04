@@ -59,6 +59,12 @@ namespace Sygnet.App
         readonly ConcurrentQueue<InboxEntry> fromBackground = new ConcurrentQueue<InboxEntry>();   // do kolejki po powrocie
         int notificationId = 100;                      // 1 = stałe powiadomienie usługi nasłuchu
 
+        // ── fałszywki: pierwsza w oknie alarmuje, kolejne po cichu do skrzynki (ochrona przed zmęczeniem alarmami) ──
+        const long FakeWindowSeconds = 600;
+        readonly object fakeLock = new object();
+        long lastFakeAlertAt = long.MinValue / 2;
+        int fakesMuted;
+
         /// <summary>Komunikat czekający na przeczytanie (odebrany w trakcie czytania innego albo przerwany).</summary>
         sealed class Pending
         {
@@ -185,9 +191,38 @@ namespace Sygnet.App
                 else if (r.Status == VerifyStatus.Duplicate) ShowToast("Już w skrzynce: " + AlertTypes.Get(r.Payload.Type).Name);
                 return r;
             }
+            // kolejna fałszywka z dźwięku w krótkim czasie: bez alarmu i bez zabierania ekranu (QR – zawsze, użytkownik sam skanował)
+            if (source != FrameSource.Qr && IsRejected(r) && !ShouldAlertFake(entry.receivedAt, out int muted))
+            {
+                ShowToast("Kolejna fałszywka (" + muted + " w ciągu " + FakeWindowSeconds / 60 + " min) – pominięta, jest w skrzynce.");
+                Home.Refresh();
+                return r;
+            }
             Alarm(r);
             Present(r, entry.receivedAt, source == FrameSource.Qr);
             return r;
+        }
+
+        static bool IsRejected(VerificationResult r) => r.Status == VerifyStatus.Forged || r.Status == VerifyStatus.Incomplete;
+
+        /// <summary>
+        /// Pierwsza fałszywka w oknie <see cref="FakeWindowSeconds"/> – alarm. Kolejne – po cichu (licznik w <paramref name="muted"/>).
+        /// Prawdziwe komunikaty nie są tym objęte. Wołane z wątku Unity i z wątku nasłuchu w tle.
+        /// </summary>
+        bool ShouldAlertFake(long at, out int muted)
+        {
+            lock (fakeLock)
+            {
+                if (at - lastFakeAlertAt < FakeWindowSeconds)
+                {
+                    muted = ++fakesMuted;
+                    return false;
+                }
+                lastFakeAlertAt = at;
+                fakesMuted = 0;
+                muted = 0;
+                return true;
+            }
         }
 
         // ───────────── kolejka komunikatów ─────────────
@@ -284,6 +319,12 @@ namespace Sygnet.App
         {
             var r = Receive(frame, FrameSource.Audio, out var entry);
             if (entry == null) return;
+            if (IsRejected(r) && !ShouldAlertFake(entry.receivedAt, out int muted))
+            {
+                // kolejna fałszywka: tylko skrzynka i jedno ciche, zbiorcze powiadomienie (bez kolejki do przeklikania)
+                AlertNotification.PostMutedFakes(muted, (int)(FakeWindowSeconds / 60));
+                return;
+            }
             fromBackground.Enqueue(entry);
             AlertNotification.Post(r, Trust, System.Threading.Interlocked.Increment(ref notificationId));
         }
@@ -378,6 +419,7 @@ namespace Sygnet.App
 
         public void ToggleTestClock()
         {
+            if (!Debug.isDebugBuild) return;                     // tylko edytor i Development Build – w wydaniu nie da się cofnąć czasu
             TestClock = !TestClock;
             testClockOffset = TestVectorsNow - DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             ShowToast(TestClock ? "Zegar testowy: czas wektorów TV1–TV6" : "Zegar systemowy");

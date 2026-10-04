@@ -45,7 +45,8 @@ Telefon obywatela ma wbudowany klucz główny (ROOT) i **sprawdza podpis offline
 - kolejka komunikatów: nowy komunikat nie zabiera ekranu w trakcie czytania – pojawia się pasek „Nowy komunikat · Pokaż”; powtórzony komunikat daje informację „Już w skrzynce”,
 - skrzynka, „Przekaż dalej”, onboarding (obszar, odcisk ROOT do porównania, zgoda na mikrofon), ekran „Klucze i nadawcy”,
 - okrąg nasłuchu reaguje na dźwięk otoczenia (poziom liczony względem szumu tła), w trakcie odbioru pokazuje postęp,
-- ukryty panel diagnostyczny: 5 × dotknięcie logo.
+- ochrona przed zalewem fałszywek: pierwsza w ciągu 10 minut alarmuje, kolejne trafiają po cichu do skrzynki (jedno zbiorcze, ciche powiadomienie); prawdziwe komunikaty zawsze przechodzą od razu,
+- ukryty panel diagnostyczny: 5 × dotknięcie logo (zegar testowy i czyszczenie unieważnień tylko w Development Build).
 
 **Konsola nadawcza** (`backend/`, Laravel 13, PHP 8.4):
 
@@ -68,6 +69,7 @@ Telefon obywatela ma wbudowany klucz główny (ROOT) i **sprawdza podpis offline
 | Kradzież jednego klucza | komunikaty krytyczne (ewakuacja) wymagają **2 podpisów**, a klucze można **unieważnić** komunikatem ROOT |
 | Podmiana klucza publicznego | klucz ROOT wbudowany w aplikację (pinning) + odcisk do sprawdzenia przez człowieka |
 | Złośliwy QR z linkiem | aplikacja nigdy nie otwiera URL-i |
+| Zalew fałszywkami (zmęczenie alarmami) | alarm tylko przy pierwszej fałszywce w ciągu 10 min, kolejne po cichu do skrzynki |
 | Brak internetu / serwerów | weryfikacja w 100% lokalna, zero zależności sieciowych |
 
 Hierarchia kluczy: **ROOT (offline)** → certyfikaty wydawców (Dowództwo Operacyjne, RCB, wojewodowie, PSP, prezydenci miast) → komunikaty. Odcisk klucza głównego wersji demo: **`82B7-E5B3-7129-166D`**.

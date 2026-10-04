@@ -47,6 +47,7 @@ namespace Sygnet.App.UI
                 App.ToggleTestClock();
                 Refresh();
             }, null, 128);
+            clockButton.gameObject.SetActive(Debug.isDebugBuild);              // w wydaniu bez cofania czasu
 
             frame = Section(c, "Ostatnia ramka");
             frame.richText = false;
@@ -62,8 +63,9 @@ namespace Sygnet.App.UI
             Ui.Label(data, "Dane", TextStyle.Overline, Theme.Muted);
             Ui.Button(data, "Wyczyść skrzynkę i pamięć odbioru", ButtonKind.Secondary, () =>
             {
-                App.Store.ClearMessages();
-                App.ShowToast("Wyczyszczono skrzynkę, seen i unieważnienia", 2f);
+                bool dev = Debug.isDebugBuild;                                   // unieważnienia kasuje tylko Development Build
+                App.Store.ClearMessages(dev);
+                App.ShowToast(dev ? "Wyczyszczono skrzynkę, seen i unieważnienia" : "Wyczyszczono skrzynkę i pamięć odbioru", 2f);
                 Refresh();
             }, Icons.Inbox, 128);
             Ui.Button(data, "Pokaż onboarding", ButtonKind.Secondary, () =>

@@ -49,6 +49,35 @@ namespace Sygnet.App
                    (t == AlertTypes.AirRaid || t == AlertTypes.Evacuation || t == AlertTypes.Chemical);
         }
 
+        /// <summary>Stały identyfikator cichego, zbiorczego powiadomienia o kolejnych fałszywkach (aktualizowane, nie dokładane).</summary>
+        public const int MutedFakesId = 50;
+
+        /// <summary>
+        /// Kolejne fałszywki w krótkim czasie – bez dźwięku i wibracji, jedno powiadomienie aktualizowane licznikiem.
+        /// Przeciwnik, który przejmie nadajnik i sypie śmieciowymi ramkami, nie zmęczy ludzi alarmami.
+        /// </summary>
+        public static void PostMutedFakes(int count, int windowMinutes)
+        {
+            string title = "⛔ Kolejne fałszywki: " + count;
+            string text = "W ciągu " + windowMinutes + " min telefon odebrał więcej fałszywych komunikatów. " +
+                          "Pominięte bez alarmu – są w skrzynce. Nie wykonuj poleceń z niezweryfikowanych komunikatów.";
+            Color32 c = Theme.Danger;
+            int argb = unchecked((int)(0xFF000000u | (uint)c.r << 16 | (uint)c.g << 8 | c.b));
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var service = new AndroidJavaClass("pl.hackyeah.sygnet.SygnetListenService"))
+                    service.CallStatic("notifyQuiet", MutedFakesId, title, text, argb);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[SYGNET] Powiadomienie zbiorcze nie wysłane: " + e);
+            }
+#else
+            Debug.Log("[SYGNET] Powiadomienie ciche #" + MutedFakesId + ": " + title + " | " + text);
+#endif
+        }
+
         /// <summary>Wysyła powiadomienie (Android; w edytorze tylko log). Wątek musi być podpięty do JVM.</summary>
         public static void Post(VerificationResult r, TrustStore trust, int id)
         {

@@ -93,6 +93,26 @@ public class SygnetListenService extends Service {
         ctx.getSystemService(NotificationManager.class).notify(id, n);
     }
 
+    /** Ciche powiadomienie (kanał nasłuchu, bez dźwięku i wibracji) – np. zbiorcze „kolejne fałszywki”. */
+    public static void notifyQuiet(int id, String title, String text, int color) {
+        Context ctx = appContext;
+        if (ctx == null) return;
+        createChannels(ctx);
+        Notification n = new Notification.Builder(ctx, CH_LISTEN)
+                .setSmallIcon(smallIcon(ctx))
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(new Notification.BigTextStyle().bigText(text))
+                .setColor(color)
+                .setOnlyAlertOnce(true)
+                .setAutoCancel(true)
+                .setShowWhen(true)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .setContentIntent(openApp(ctx))
+                .build();
+        ctx.getSystemService(NotificationManager.class).notify(id, n);
+    }
+
     // ───────────── usługa ─────────────
 
     @Override
