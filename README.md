@@ -6,7 +6,8 @@ HackYeah 2026 · kategoria Defence
 **Wypróbuj:**
 
 - konsola nadawcza: **https://api.hackathon.copentro.com/console** (hasło dla oceniających jest na stronie logowania),
-- aplikacja na Androida: **https://api.hackathon.copentro.com/sygnet.apk**.
+- aplikacja na Androida: **https://api.hackathon.copentro.com/sygnet.apk**,
+- prezentacja (PDF, 10 slajdów): **[docs/SYGNET_prezentacja.pdf](docs/SYGNET_prezentacja.pdf)**.
 
 ## 1. Problem
 
